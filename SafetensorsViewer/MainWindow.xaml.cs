@@ -10,6 +10,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using Onnxify.Safetensors;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 
 namespace SafetensorsViewer
 {
@@ -30,10 +31,15 @@ namespace SafetensorsViewer
         }
         async void CommandOpen()
         {
-            Task<SafeTensors> loadTask = SafeTensors.LoadFromFileAsync("lokr.safetensors");
-            SafeTensors T = await loadTask;
-            int a = 0;
-            // Do something with the loaded tensors
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "SafeTensors files (*.safetensors, *.sft)|*.safetensors;*.sft|All files (*.*)|*.*";
+            if (openFileDialog.ShowDialog() == true)
+            {
+                Task<SafeTensors> loadTask = SafeTensors.LoadFromFileAsync(openFileDialog.FileName);
+                SafeTensors T = await loadTask;
+                int a = 0;
+                // Do something with the loaded tensors
+            }
         }
     }
 }
