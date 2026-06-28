@@ -1,8 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
-using Onnxify.Safetensors;
-using SciChart.Charting2D.Interop;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,6 +12,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using TorchSharp;
+using TorchSharp.PyBridge;
 
 namespace SafetensorsViewer
 {
@@ -24,15 +25,28 @@ namespace SafetensorsViewer
 
     public partial class MainWindow : Window, INotifyPropertyChanged, INotifyPropertyChanging
     {
-        SafeTensors? _safetensors;
-        SafeTensors? LoadedSafetensors {
+        torch.Tensor? _safetensors;
+        torch.Tensor? LoadedSafetensors {
             get {
                 return _safetensors;
             } set {
-                if (_safetensors != value) {
+                if (!EqualityComparer<torch.Tensor?>.Default.Equals(_safetensors, value))
+                {
                     PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(LoadedSafetensors)));
                     _safetensors = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LoadedSafetensors)));
+                }
+            }
+        }
+        double[,]? _dataMatrix;
+        public double[,]? DataMatrix {
+            get {
+                return _dataMatrix;
+            } set {
+                if (_dataMatrix != value) {
+                    PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(DataMatrix)));
+                    _dataMatrix = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DataMatrix)));
                 }
             }
         }
@@ -53,8 +67,10 @@ namespace SafetensorsViewer
             openFileDialog.Filter = "SafeTensors files (*.safetensors, *.sft)|*.safetensors;*.sft|All files (*.*)|*.*";
             if (openFileDialog.ShowDialog() == true)
             {
-                Task<SafeTensors> loadTask = SafeTensors.LoadFromFileAsync(openFileDialog.FileName);
-                LoadedSafetensors = await loadTask;
+                torch.Tensor loadTask = await Task.Run(() => torch.load_safetensors(openFileDialog.FileName));
+
+                LoadedSafetensors = loadTask;
+                MessageBox.Show($"Loaded {LoadedSafetensors.names.Count()} tensors.\nFirst tensor shape: {string.Join(", ", LoadedSafetensors.names)}\nData type: {LoadedSafetensors.dtype}\nData length: {LoadedSafetensors.numel() * LoadedSafetensors.element_size()} bytes", "SafeTensors Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
     }
