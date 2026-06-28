@@ -67,10 +67,10 @@ namespace SafetensorsViewer
             openFileDialog.Filter = "SafeTensors files (*.safetensors, *.sft)|*.safetensors;*.sft|All files (*.*)|*.*";
             if (openFileDialog.ShowDialog() == true)
             {
-                torch.Tensor loadTask = await Task.Run(() => torch.load_safetensors(openFileDialog.FileName));
-
-                LoadedSafetensors = loadTask;
-                MessageBox.Show($"Loaded {LoadedSafetensors.names.Count()} tensors.\nFirst tensor shape: {string.Join(", ", LoadedSafetensors.names)}\nData type: {LoadedSafetensors.dtype}\nData length: {LoadedSafetensors.numel() * LoadedSafetensors.element_size()} bytes", "SafeTensors Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+                SafetensorsFileReader sfr = new SafetensorsFileReader(openFileDialog.FileName);
+                MessageBox.Show(sfr.Keys.Last());
+                //LoadedSafetensors = loadTask;
+                //MessageBox.Show($"Loaded {LoadedSafetensors.names.Count()} tensors.\nFirst tensor shape: {string.Join(", ", LoadedSafetensors.names)}\nData type: {LoadedSafetensors.dtype}\nData length: {LoadedSafetensors.numel() * LoadedSafetensors.element_size()} bytes", "SafeTensors Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
     }
