@@ -1,4 +1,9 @@
-﻿using System.Text;
+﻿using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
+using Onnxify.Safetensors;
+using SciChart.Charting2D.Interop;
+using System.ComponentModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -8,9 +13,6 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using Onnxify.Safetensors;
-using CommunityToolkit.Mvvm.Input;
-using Microsoft.Win32;
 
 namespace SafetensorsViewer
 {
@@ -20,9 +22,25 @@ namespace SafetensorsViewer
     ///
 
 
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged, INotifyPropertyChanging
     {
-        public RelayCommand OpenCommand;
+        SafeTensors? _safetensors;
+        SafeTensors? LoadedSafetensors {
+            get {
+                return _safetensors;
+            } set {
+                if (_safetensors != value) {
+                    PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(LoadedSafetensors)));
+                    _safetensors = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LoadedSafetensors)));
+                }
+            }
+        }
+        public RelayCommand? OpenCommand;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public event PropertyChangingEventHandler? PropertyChanging;
+
         public ICommand openCMD => OpenCommand ??= new RelayCommand(CommandOpen, () => true);
 
         public MainWindow()
@@ -36,9 +54,7 @@ namespace SafetensorsViewer
             if (openFileDialog.ShowDialog() == true)
             {
                 Task<SafeTensors> loadTask = SafeTensors.LoadFromFileAsync(openFileDialog.FileName);
-                SafeTensors T = await loadTask;
-                int a = 0;
-                // Do something with the loaded tensors
+                LoadedSafetensors = await loadTask;
             }
         }
     }

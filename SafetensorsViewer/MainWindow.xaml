@@ -6,14 +6,14 @@
         xmlns:local="clr-namespace:SafetensorsViewer"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800"
-        DataContext="{Binding RelativeSource={RelativeSource Self}}">
-    <Grid VerticalAlignment="Top">
-        <StatusBar Height="25" VerticalAlignment="Bottom" >
-            <StatusBarItem>
-                <TextBlock Text="Ready" />
-            </StatusBarItem>
-        </StatusBar>
-        <Menu Height="25">
+        DataContext="{Binding RelativeSource={RelativeSource Self}}"
+>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="7*"/>
+            <ColumnDefinition Width="18*"/>
+        </Grid.ColumnDefinitions>
+        <Menu Height="25" VerticalAlignment="Top" Grid.ColumnSpan="2">
             <MenuItem Header="File">
                 <MenuItem Header="Open" Command="{Binding Path=openCMD}"/>
                 <MenuItem Header="Save" />
@@ -21,6 +21,10 @@
                 <MenuItem Header="Exit" />
             </MenuItem>
         </Menu>
-
+        <StatusBar Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="2" >
+            <StatusBarItem>
+                <TextBlock Text="Ready" />
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
