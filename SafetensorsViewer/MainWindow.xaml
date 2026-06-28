@@ -5,8 +5,22 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SafetensorsViewer"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="MainWindow" Height="450" Width="800"
+        DataContext="{Binding RelativeSource={RelativeSource Self}}">
+    <Grid VerticalAlignment="Top">
+        <StatusBar Height="25" VerticalAlignment="Bottom" >
+            <StatusBarItem>
+                <TextBlock Text="Ready" />
+            </StatusBarItem>
+        </StatusBar>
+        <Menu Height="25">
+            <MenuItem Header="File">
+                <MenuItem Header="Open" Command="{Binding Path=openCMD}"/>
+                <MenuItem Header="Save" />
+                <Separator />
+                <MenuItem Header="Exit" />
+            </MenuItem>
+        </Menu>
 
     </Grid>
 </Window>

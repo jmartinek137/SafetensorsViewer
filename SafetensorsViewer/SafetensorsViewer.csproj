@@ -8,4 +8,10 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Onnxify.Safetensors" Version="0.3.7" />
+    <PackageReference Include="SciChart.DirectX" Version="8.11.1.28988" />
+  </ItemGroup>
+
 </Project>
