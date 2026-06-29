@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using ScottPlot.WPF;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -26,7 +27,7 @@ namespace SafetensorsViewer
             get {
                 return _safetensors;
             } set {
-                if (!EqualityComparer<torch.Tensor?>.Default.Equals(_safetensors, value))
+                if (_safetensors is null || value is null || value.shape.SequenceCompareTo(_safetensors.shape) != 0 || !EqualityComparer<torch.Tensor?>.Default.Equals(_safetensors, value))
                 {
                     PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(LoadedSafetensors)));
                     _safetensors = value;
@@ -47,10 +48,22 @@ namespace SafetensorsViewer
                     MyPlot.Reset();
                     MyPlot.Plot.ShowLegend();
                     if (value != null) {
-                        var heatmap = MyPlot.Plot.Add.Heatmap(value);
-                        heatmap.Colormap = new ScottPlot.Colormaps.Turbo();
-                        MyPlot.Plot.Add.ColorBar(heatmap);
-                        MyPlot.Refresh();
+                        if (IsHeatmapChecked)
+                        {
+                            var heatmap = MyPlot.Plot.Add.Heatmap(value);
+                            heatmap.Colormap = new ScottPlot.Colormaps.Turbo();
+                            MyPlot.Plot.Add.ColorBar(heatmap);
+                            MyPlot.Refresh();
+                        }
+                        else if (IsHistogramChecked)
+                        {
+                            var hist = ScottPlot.Statistics.Histogram.WithBinCount((int)Math.Ceiling(Math.Sqrt(_dataMatrix.Length)), torch.min(LoadedSafetensors).item<double>()-1e-10, torch.max(LoadedSafetensors).item<double>()+1e-10);
+                            hist.AddRange(_dataMatrix.Cast<double>());
+                            var histogram = MyPlot.Plot.Add.Histogram(hist);
+                            MyPlot.Plot.XLabel("Value");
+                            MyPlot.Plot.YLabel("Count");
+                            MyPlot.Refresh();
+                        }
                     }
                 }
             }
@@ -76,9 +89,9 @@ namespace SafetensorsViewer
                     }
                     if (t.ContainsKey(_selectedTensorKey))
                     {
-                        using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
+                        var doubleTensor = t[_selectedTensorKey].to_type(torch.ScalarType.Float64);
                         TensorAccessor<double> vv = doubleTensor.data<double>();
-
+                        LoadedSafetensors = doubleTensor;
                         double[,] nativeMatrix = new double[t[_selectedTensorKey].shape.Count() > 0 ? t[_selectedTensorKey].shape[0] : 1, t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
                         var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
                         vv.CopyTo(targetSpan);
