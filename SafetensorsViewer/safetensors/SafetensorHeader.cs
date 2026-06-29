@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using TorchSharp;
 
 public class SafetensorHeader
 {
@@ -10,7 +11,8 @@ public class SafetensorHeader
 public class TensorInfo
 {
     [JsonPropertyName("dtype")]
-    public string DType { get; set; } = string.Empty;
+    [JsonConverter(typeof(DTypeConverter))]
+    public torch.ScalarType DType { get; set; } = 0;
 
     [JsonPropertyName("shape")]
     public long[] Shape { get; set; } = Array.Empty<long>();

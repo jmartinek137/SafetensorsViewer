@@ -47,4 +47,21 @@ public class SafetensorsFileReader
     }
 
     public string[] Keys { get { return _tensorRegistry.Keys.ToArray(); } }
+
+    public byte[] GetTensor(string key)
+    {
+        if (!_tensorRegistry.ContainsKey(key))
+        {
+            throw new KeyNotFoundException($"Tensor with key '{key}' not found.");
+        }
+        TensorInfo info = _tensorRegistry[key];
+        long dataLength = info.DataOffsets[1] - info.DataOffsets[0];
+        byte[] tensorData = new byte[dataLength];
+        using (FileStream fs = new FileStream(_currentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            fs.Seek(info.DataOffsets[0], SeekOrigin.Begin);
+            fs.ReadExactly(tensorData, 0, (int)dataLength);
+        }
+        return tensorData;
+    }
 }

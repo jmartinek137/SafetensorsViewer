@@ -14,6 +14,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using TorchSharp;
 using TorchSharp.PyBridge;
+using TorchSharp.Utils;
 
 namespace SafetensorsViewer
 {
@@ -68,9 +69,12 @@ namespace SafetensorsViewer
             if (openFileDialog.ShowDialog() == true)
             {
                 SafetensorsFileReader sfr = new SafetensorsFileReader(openFileDialog.FileName);
-                MessageBox.Show(sfr.Keys.Last());
-                //LoadedSafetensors = loadTask;
-                //MessageBox.Show($"Loaded {LoadedSafetensors.names.Count()} tensors.\nFirst tensor shape: {string.Join(", ", LoadedSafetensors.names)}\nData type: {LoadedSafetensors.dtype}\nData length: {LoadedSafetensors.numel() * LoadedSafetensors.element_size()} bytes", "SafeTensors Loaded", MessageBoxButton.OK, MessageBoxImage.Information);
+                byte[] v = sfr.GetTensor(sfr.Keys.Last());
+                torch.Tensor tensor = torch.tensor(v, sfr.TensorRegistry[sfr.Keys.Last()].Shape, sfr.TensorRegistry[sfr.Keys.Last()].DType);
+                TensorAccessor<double> vv = tensor.to_type(torch.ScalarType.Float64).data<double>();
+
+                MessageBox.Show(string.Join(", ", sfr.TensorRegistry[sfr.Keys.Last()].Shape));
+
             }
         }
     }
