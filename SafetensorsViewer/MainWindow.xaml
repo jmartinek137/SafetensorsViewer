@@ -32,5 +32,6 @@
             </StatusBarItem>
         </StatusBar>
         <WpfPlot:WpfPlot Name="MyPlot" Grid.Column="1" Grid.RowSpan="1" Grid.Row="1" DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}"/>
+        <ComboBox ItemsSource="{Binding Path=TensorKeys}"  Margin="0,25,0,0" Grid.Row="1" VerticalAlignment="Top" Width="164"     SelectedItem="{Binding SelectedTensorKey, Mode=TwoWay}" />
     </Grid>
 </Window>

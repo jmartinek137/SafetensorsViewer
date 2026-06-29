@@ -1,19 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using TorchSharp;
-using TorchSharp.PyBridge;
 using TorchSharp.Utils;
 
 namespace SafetensorsViewer
@@ -27,6 +19,7 @@ namespace SafetensorsViewer
     public partial class MainWindow : Window, INotifyPropertyChanged, INotifyPropertyChanging
     {
         torch.Tensor? _safetensors;
+        string tensorpath=string.Empty;
         torch.Tensor? LoadedSafetensors {
             get {
                 return _safetensors;
@@ -59,6 +52,31 @@ namespace SafetensorsViewer
                 }
             }
         }
+        private string? _selectedTensorKey;
+
+        public string? SelectedTensorKey
+        {
+            get => _selectedTensorKey;
+            set
+            {
+                if (_selectedTensorKey == value)
+                    return;
+
+                _selectedTensorKey = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
+
+                Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(tensorpath, [_selectedTensorKey]);
+                using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
+                TensorAccessor<double> vv = doubleTensor.data<double>();
+
+                double[,] nativeMatrix = new double[t[_selectedTensorKey].shape[0], t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
+                var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
+                vv.CopyTo(targetSpan);
+
+                DataMatrix = nativeMatrix;
+            }
+        }
+        public ObservableCollection<string> TensorKeys { get; set; } = new ObservableCollection<string>();
         public RelayCommand? OpenCommand;
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -80,26 +98,13 @@ namespace SafetensorsViewer
             OpenFileDialog openFileDialog = new OpenFileDialog();
             if (openFileDialog.ShowDialog() == true)
             {
-                SafetensorsFileReader sfr = new SafetensorsFileReader(openFileDialog.FileName);
-                var registryInfo = sfr.TensorRegistry[sfr.Keys.Last()];
-                long[] shape = registryInfo.Shape;
-                int height = (int)shape[0];
-                int width = (int)shape[1];
-                byte[] v = sfr.GetTensor(sfr.Keys.Last());
-
-                Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(openFileDialog.FileName, [sfr.Keys.Last()]);
-                using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
-                TensorAccessor<double> vv = doubleTensor.data<double>();
-
-                // 5. Alokace C# matice a zkopírování dat do ScottPlotu
-                double[,] nativeMatrix = new double[height, width];
-                var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], height * width);
-                vv.CopyTo(targetSpan);
-
-                DataMatrix = nativeMatrix;
+                tensorpath = openFileDialog.FileName;
+                SafetensorsFileReader sfr = new SafetensorsFileReader(tensorpath);
+                foreach (var key in sfr.Keys)
+                {
+                    TensorKeys.Add(key);
+                }
             }
-
-
         }
     }
 }
