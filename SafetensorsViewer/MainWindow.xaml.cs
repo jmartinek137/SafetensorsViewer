@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -91,7 +91,7 @@ namespace SafetensorsViewer
                 }
             }
         }
-        public ObservableCollection<TreeViewItem> TensorKeys { get; set; } = new ObservableCollection<TreeViewItem>();
+        public ObservableCollection<TensorNodeViewModel> TensorKeys { get; set; } = new ObservableCollection<TensorNodeViewModel>();
         public RelayCommand? OpenCommand;
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -99,10 +99,104 @@ namespace SafetensorsViewer
 
         public ICommand openCMD => OpenCommand ??= new RelayCommand(CommandOpen, () => true);
 
+        private bool _isHeatmapChecked = true;
+        private bool _isHistogramChecked;
+        private bool _isStatisticsChecked;
+
+        public bool IsHeatmapChecked
+        {
+            get => _isHeatmapChecked;
+            set
+            {
+                if (_isHeatmapChecked != value)
+                {
+                    _isHeatmapChecked = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHeatmapChecked)));
+                    if (value)
+                    {
+                        IsHistogramChecked = false;
+                        IsStatisticsChecked = false;
+                    }
+                    else if (!IsHistogramChecked && !IsStatisticsChecked)
+                    {
+                        _isHeatmapChecked = true;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHeatmapChecked)));
+                    }
+                }
+            }
+        }
+
+        public bool IsHistogramChecked
+        {
+            get => _isHistogramChecked;
+            set
+            {
+                if (_isHistogramChecked != value)
+                {
+                    _isHistogramChecked = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHistogramChecked)));
+                    if (value)
+                    {
+                        IsHeatmapChecked = false;
+                        IsStatisticsChecked = false;
+                    }
+                    else if (!IsHeatmapChecked && !IsStatisticsChecked)
+                    {
+                        _isHistogramChecked = true;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHistogramChecked)));
+                    }
+                }
+            }
+        }
+
+        public bool IsStatisticsChecked
+        {
+            get => _isStatisticsChecked;
+            set
+            {
+                if (_isStatisticsChecked != value)
+                {
+                    _isStatisticsChecked = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsStatisticsChecked)));
+                    if (value)
+                    {
+                        IsHeatmapChecked = false;
+                        IsHistogramChecked = false;
+                    }
+                    else if (!IsHeatmapChecked && !IsHistogramChecked)
+                    {
+                        _isStatisticsChecked = true;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsStatisticsChecked)));
+                    }
+                }
+            }
+        }
+
+        private RelayCommand<string>? _viewCommand;
+        public ICommand viewCMD => _viewCommand ??= new RelayCommand<string>(CommandView);
+
+        private void CommandView(string? viewType)
+        {
+            if (string.IsNullOrEmpty(viewType)) return;
+            if (viewType == "Heatmap") IsHeatmapChecked = true;
+            else if (viewType == "Histogram") IsHistogramChecked = true;
+            else if (viewType == "Statistics") IsStatisticsChecked = true;
+        }
+
         public MainWindow()
         {
             InitializeComponent();
+            TensorNodeViewModel.NodeSelected += OnNodeSelected;
         }
+
+        private void OnNodeSelected(TensorNodeViewModel selectedNode)
+        {
+            if (selectedNode.Tag != null)
+            {
+                SelectedTensorKey = selectedNode.Tag;
+            }
+        }
+
         async void CommandOpen()
         {
 
@@ -115,8 +209,8 @@ namespace SafetensorsViewer
 
                 TensorKeys.Clear();
 
-                Dictionary<string, TreeViewItem> nodes = new();
-                TreeViewItem? parent;
+                Dictionary<string, TensorNodeViewModel> nodes = new();
+                TensorNodeViewModel? parent;
                 foreach (string key in sfr.Keys)
                 {
                     string[] parts = key.Split('.');
@@ -128,28 +222,24 @@ namespace SafetensorsViewer
                     {
                         path = path.Length == 0 ? part : $"{path}.{part}";
 
-                        if (!nodes.TryGetValue(path, out TreeViewItem? node))
+                        if (!nodes.TryGetValue(path, out TensorNodeViewModel? node))
                         {
-                            node = new TreeViewItem { Header = part };
+                            node = new TensorNodeViewModel { Header = part };
                             nodes[path] = node;
 
                             if (parent == null)
                                 TensorKeys.Add(node);
                             else
-                                parent.Items.Add(node);
+                                parent.Children.Add(node);
                         }
 
                         parent = node;
                     }
-                    parent.Tag = key;
+                    if (parent != null)
+                    {
+                        parent.Tag = key;
+                    }
                 }
-            }
-        }
-        void TreeView_OnSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        {
-            if (e.NewValue is TreeViewItem selectedKey)
-            {
-                SelectedTensorKey = selectedKey.Tag?.ToString();
             }
         }
     }
