@@ -42,7 +42,8 @@ namespace SafetensorsViewer
                     PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(DataMatrix)));
                     _dataMatrix = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DataMatrix)));
-                    MyPlot.Plot.Clear();
+                    MyPlot.Reset();
+                    MyPlot.Plot.ShowLegend();
                     if (value != null) {
                         var heatmap = MyPlot.Plot.Add.Heatmap(value);
                         heatmap.Colormap = new ScottPlot.Colormaps.Turbo();
@@ -69,7 +70,7 @@ namespace SafetensorsViewer
                 using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
                 TensorAccessor<double> vv = doubleTensor.data<double>();
 
-                double[,] nativeMatrix = new double[t[_selectedTensorKey].shape[0], t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
+                double[,] nativeMatrix = new double[t[_selectedTensorKey].shape.Count() > 0 ? t[_selectedTensorKey].shape[0] : 1, t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
                 var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
                 vv.CopyTo(targetSpan);
 
