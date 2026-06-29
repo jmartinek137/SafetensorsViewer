@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -91,14 +91,13 @@ namespace SafetensorsViewer
                 }
             }
         }
-        public ObservableCollection<TensorNodeViewModel> TensorKeys { get; set; } = new ObservableCollection<TensorNodeViewModel>();
+        public ObservableCollection<TreeViewItem> TensorKeys { get; set; } = new ObservableCollection<TreeViewItem>();
         public RelayCommand? OpenCommand;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public event PropertyChangingEventHandler? PropertyChanging;
 
         public ICommand openCMD => OpenCommand ??= new RelayCommand(CommandOpen, () => true);
-
         private bool _isHeatmapChecked = true;
         private bool _isHistogramChecked;
         private bool _isStatisticsChecked;
@@ -186,17 +185,7 @@ namespace SafetensorsViewer
         public MainWindow()
         {
             InitializeComponent();
-            TensorNodeViewModel.NodeSelected += OnNodeSelected;
         }
-
-        private void OnNodeSelected(TensorNodeViewModel selectedNode)
-        {
-            if (selectedNode.Tag != null)
-            {
-                SelectedTensorKey = selectedNode.Tag;
-            }
-        }
-
         async void CommandOpen()
         {
 
@@ -209,8 +198,8 @@ namespace SafetensorsViewer
 
                 TensorKeys.Clear();
 
-                Dictionary<string, TensorNodeViewModel> nodes = new();
-                TensorNodeViewModel? parent;
+                Dictionary<string, TreeViewItem> nodes = new();
+                TreeViewItem? parent;
                 foreach (string key in sfr.Keys)
                 {
                     string[] parts = key.Split('.');
@@ -222,24 +211,28 @@ namespace SafetensorsViewer
                     {
                         path = path.Length == 0 ? part : $"{path}.{part}";
 
-                        if (!nodes.TryGetValue(path, out TensorNodeViewModel? node))
+                        if (!nodes.TryGetValue(path, out TreeViewItem? node))
                         {
-                            node = new TensorNodeViewModel { Header = part };
+                            node = new TreeViewItem { Header = part };
                             nodes[path] = node;
 
                             if (parent == null)
                                 TensorKeys.Add(node);
                             else
-                                parent.Children.Add(node);
+                                parent.Items.Add(node);
                         }
 
                         parent = node;
                     }
-                    if (parent != null)
-                    {
-                        parent.Tag = key;
-                    }
+                    parent.Tag = key;
                 }
+            }
+        }
+        void TreeView_OnSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (e.NewValue is TreeViewItem selectedKey)
+            {
+                SelectedTensorKey = selectedKey.Tag?.ToString();
             }
         }
     }
