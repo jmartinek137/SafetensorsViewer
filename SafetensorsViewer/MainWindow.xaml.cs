@@ -69,25 +69,37 @@ namespace SafetensorsViewer
         public MainWindow()
         {
             InitializeComponent();
+            int[] t = new int[] { 0x7Fffffff, 1, 0, 0};
+            var tv = torch.frombuffer(t, torch.ScalarType.Int32,4,0);
+
         }
         async void CommandOpen()
         {
+
+
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "SafeTensors files (*.safetensors, *.sft)|*.safetensors;*.sft|All files (*.*)|*.*";
             if (openFileDialog.ShowDialog() == true)
             {
                 SafetensorsFileReader sfr = new SafetensorsFileReader(openFileDialog.FileName);
-                long[] shape = sfr.TensorRegistry[sfr.Keys.Last()].Shape;
+                var registryInfo = sfr.TensorRegistry[sfr.Keys.Last()];
+                long[] shape = registryInfo.Shape;
                 int height = (int)shape[0];
                 int width = (int)shape[1];
                 byte[] v = sfr.GetTensor(sfr.Keys.Last());
-                torch.Tensor tensor = torch.tensor(v, shape, sfr.TensorRegistry[sfr.Keys.Last()].DType);
-                TensorAccessor<double> vv = tensor.to_type(torch.ScalarType.Float64).data<double>();
+
+                Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(openFileDialog.FileName, [sfr.Keys.Last()]);
+                using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
+                TensorAccessor<double> vv = doubleTensor.data<double>();
+
+                // 5. Alokace C# matice a zkopírování dat do ScottPlotu
                 double[,] nativeMatrix = new double[height, width];
                 var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], height * width);
                 vv.CopyTo(targetSpan);
+
                 DataMatrix = nativeMatrix;
             }
+
+
         }
     }
 }
