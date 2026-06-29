@@ -4,7 +4,7 @@ using System.Text.Json;
 
 public class SafetensorsFileReader
 {
-    private Dictionary<string, TensorInfo> _tensorRegistry = new Dictionary<string, TensorInfo>();
+    private Dictionary<string, TensorInfo> _tensorRegistry = new();
     private string _currentFilePath = string.Empty;
 
     public Dictionary<string, TensorInfo> TensorRegistry => _tensorRegistry;
@@ -17,7 +17,7 @@ public class SafetensorsFileReader
         byte[] headerLengthBytes = new byte[8];
         ulong headerLength;
         byte[] headerBytes;
-        using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using (FileStream fs = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
             fs.ReadExactly(headerLengthBytes, 0, 8);
             headerLength = BitConverter.ToUInt64(headerLengthBytes, 0);
@@ -57,7 +57,7 @@ public class SafetensorsFileReader
         TensorInfo info = _tensorRegistry[key];
         long dataLength = info.DataOffsets[1] - info.DataOffsets[0];
         byte[] tensorData = new byte[dataLength];
-        using (FileStream fs = new FileStream(_currentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using (FileStream fs = new(_currentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
             fs.Seek(info.DataOffsets[0], SeekOrigin.Begin);
             fs.ReadExactly(tensorData, 0, (int)dataLength);

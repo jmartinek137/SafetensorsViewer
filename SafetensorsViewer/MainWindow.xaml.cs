@@ -4,9 +4,11 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using TorchSharp;
 using TorchSharp.Utils;
+using static Tensorboard.CostGraphDef.Types;
 
 namespace SafetensorsViewer
 {
@@ -67,17 +69,24 @@ namespace SafetensorsViewer
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
 
                 Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(tensorpath, [_selectedTensorKey]);
-                using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
-                TensorAccessor<double> vv = doubleTensor.data<double>();
+                if(!t.ContainsKey(_selectedTensorKey))
+                {
+                    _selectedTensorKey = _selectedTensorKey+ ".weight";
+                }
+                if (t.ContainsKey(_selectedTensorKey))
+                {
+                    using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
+                    TensorAccessor<double> vv = doubleTensor.data<double>();
+               
+                    double[,] nativeMatrix = new double[t[_selectedTensorKey].shape.Count() > 0 ? t[_selectedTensorKey].shape[0] : 1, t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
+                    var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
+                    vv.CopyTo(targetSpan);
 
-                double[,] nativeMatrix = new double[t[_selectedTensorKey].shape.Count() > 0 ? t[_selectedTensorKey].shape[0] : 1, t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
-                var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
-                vv.CopyTo(targetSpan);
-
-                DataMatrix = nativeMatrix;
+                    DataMatrix = nativeMatrix;
+                }
             }
         }
-        public ObservableCollection<string> TensorKeys { get; set; } = new ObservableCollection<string>();
+        public ObservableCollection<TreeViewItem> TensorKeys { get; set; } = new ObservableCollection<TreeViewItem>();
         public RelayCommand? OpenCommand;
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -88,23 +97,54 @@ namespace SafetensorsViewer
         public MainWindow()
         {
             InitializeComponent();
-            int[] t = new int[] { 0x7Fffffff, 1, 0, 0};
-            var tv = torch.frombuffer(t, torch.ScalarType.Int32,4,0);
-
         }
         async void CommandOpen()
         {
 
 
-            OpenFileDialog openFileDialog = new OpenFileDialog();
+            OpenFileDialog openFileDialog = new();
             if (openFileDialog.ShowDialog() == true)
             {
                 tensorpath = openFileDialog.FileName;
-                SafetensorsFileReader sfr = new SafetensorsFileReader(tensorpath);
-                foreach (var key in sfr.Keys)
+                SafetensorsFileReader sfr = new(tensorpath);
+
+                TensorKeys.Clear();
+
+                Dictionary<string, TreeViewItem> nodes = new();
+                TreeViewItem? parent;
+                foreach (string key in sfr.Keys)
                 {
-                    TensorKeys.Add(key);
+                    string[] parts = key.Split('.');
+                    string path = "";
+
+                    parent = null;
+
+                    foreach (string part in parts)
+                    {
+                        path = path.Length == 0 ? part : $"{path}.{part}";
+
+                        if (!nodes.TryGetValue(path, out TreeViewItem? node))
+                        {
+                            node = new TreeViewItem { Header = part };
+                            nodes[path] = node;
+
+                            if (parent == null)
+                                TensorKeys.Add(node);
+                            else
+                                parent.Items.Add(node);
+                        }
+
+                        parent = node;
+                    }
+                    parent.Tag = key;
                 }
+            }
+        }
+        void TreeView_OnSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (e.NewValue is TreeViewItem selectedKey)
+            {
+                SelectedTensorKey = selectedKey.Tag?.ToString();
             }
         }
     }
