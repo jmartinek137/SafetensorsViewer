@@ -36,6 +36,7 @@ namespace SafetensorsViewer
                     PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(LoadedSafetensors)));
                     _safetensors = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LoadedSafetensors)));
+
                 }
             }
         }
@@ -48,6 +49,13 @@ namespace SafetensorsViewer
                     PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(DataMatrix)));
                     _dataMatrix = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DataMatrix)));
+                    MyPlot.Plot.Clear();
+                    if (value != null) {
+                        var heatmap = MyPlot.Plot.Add.Heatmap(value);
+                        heatmap.Colormap = new ScottPlot.Colormaps.Turbo();
+                        MyPlot.Plot.Add.ColorBar(heatmap);
+                        MyPlot.Refresh();
+                    }
                 }
             }
         }
@@ -69,12 +77,16 @@ namespace SafetensorsViewer
             if (openFileDialog.ShowDialog() == true)
             {
                 SafetensorsFileReader sfr = new SafetensorsFileReader(openFileDialog.FileName);
+                long[] shape = sfr.TensorRegistry[sfr.Keys.Last()].Shape;
+                int height = (int)shape[0];
+                int width = (int)shape[1];
                 byte[] v = sfr.GetTensor(sfr.Keys.Last());
-                torch.Tensor tensor = torch.tensor(v, sfr.TensorRegistry[sfr.Keys.Last()].Shape, sfr.TensorRegistry[sfr.Keys.Last()].DType);
+                torch.Tensor tensor = torch.tensor(v, shape, sfr.TensorRegistry[sfr.Keys.Last()].DType);
                 TensorAccessor<double> vv = tensor.to_type(torch.ScalarType.Float64).data<double>();
-
-                MessageBox.Show(string.Join(", ", sfr.TensorRegistry[sfr.Keys.Last()].Shape));
-
+                double[,] nativeMatrix = new double[height, width];
+                var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], height * width);
+                vv.CopyTo(targetSpan);
+                DataMatrix = nativeMatrix;
             }
         }
     }
