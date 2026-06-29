@@ -64,25 +64,30 @@ namespace SafetensorsViewer
             {
                 if (_selectedTensorKey == value)
                     return;
-
                 _selectedTensorKey = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
-
-                Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(tensorpath, [_selectedTensorKey]);
-                if(!t.ContainsKey(_selectedTensorKey))
+                if (_selectedTensorKey != null)
                 {
-                    _selectedTensorKey = _selectedTensorKey+ ".weight";
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
+
+                    Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(tensorpath, [_selectedTensorKey]);
+                    if (!t.ContainsKey(_selectedTensorKey))
+                    {
+                        _selectedTensorKey = _selectedTensorKey + ".weight";
+                    }
+                    if (t.ContainsKey(_selectedTensorKey))
+                    {
+                        using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
+                        TensorAccessor<double> vv = doubleTensor.data<double>();
+
+                        double[,] nativeMatrix = new double[t[_selectedTensorKey].shape.Count() > 0 ? t[_selectedTensorKey].shape[0] : 1, t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
+                        var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
+                        vv.CopyTo(targetSpan);
+
+                        DataMatrix = nativeMatrix;
+                    }
                 }
-                if (t.ContainsKey(_selectedTensorKey))
-                {
-                    using var doubleTensor = t.Values.Last().to_type(torch.ScalarType.Float64);
-                    TensorAccessor<double> vv = doubleTensor.data<double>();
-               
-                    double[,] nativeMatrix = new double[t[_selectedTensorKey].shape.Count() > 0 ? t[_selectedTensorKey].shape[0] : 1, t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
-                    var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
-                    vv.CopyTo(targetSpan);
-
-                    DataMatrix = nativeMatrix;
+                else {
+                    DataMatrix = null;
                 }
             }
         }
