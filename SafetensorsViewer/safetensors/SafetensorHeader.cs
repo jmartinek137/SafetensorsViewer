@@ -11,12 +11,11 @@ public class SafetensorHeader
 public class TensorInfo
 {
     [JsonPropertyName("dtype")]
-    [JsonConverter(typeof(DTypeConverter))]
-    public torch.ScalarType DType { get; set; } = 0;
+    public string DType { get; set; } = String.Empty;
 
     [JsonPropertyName("shape")]
-    public long[] Shape { get; set; } = Array.Empty<long>();
+    public long[] Shape { get; set; } = [];
 
     [JsonPropertyName("data_offsets")]
-    public long[] DataOffsets { get; set; } = Array.Empty<long>();
+    public long[] DataOffsets { get; set; } = [];
 }
