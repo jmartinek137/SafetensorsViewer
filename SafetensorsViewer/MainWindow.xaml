@@ -5,38 +5,35 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SafetensorsViewer" xmlns:WpfPlot="http://schemas.scottplot.net/2008/xaml/presentation"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800"
+        Title="MainWindow" Height="450" Width="900"
         DataContext="{Binding RelativeSource={RelativeSource Self}}"
 >
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="24*"/>
-            <RowDefinition Height="387*"/>
-            <RowDefinition Height="23*"/>
+            <RowDefinition Height="380*"/>
+            <RowDefinition Height="24*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="7*"/>
-            <ColumnDefinition Width="18*"/>
+            <ColumnDefinition Width="1*"/>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="2*"/>
         </Grid.ColumnDefinitions>
-        <Menu Height="25" VerticalAlignment="Center" Grid.ColumnSpan="2">
+        <Menu Height="25" VerticalAlignment="Center" Grid.ColumnSpan="3">
             <MenuItem Header="File">
                 <MenuItem Header="Open" Command="{Binding Path=openCMD}"/>
                 <MenuItem Header="Save" />
                 <Separator />
                 <MenuItem Header="Exit" />
             </MenuItem>
-            <MenuItem Header="View">
-                <MenuItem Header="Heatmap" IsCheckable="True" IsChecked="{Binding IsHeatmapChecked, Mode=TwoWay}" Command="{Binding Path=viewCMD}" CommandParameter="Heatmap"/>
-                <MenuItem Header="Histogram" IsCheckable="True" IsChecked="{Binding IsHistogramChecked, Mode=TwoWay}" Command="{Binding Path=viewCMD}" CommandParameter="Histogram"/>
-                <MenuItem Header="Statistics" IsCheckable="True" IsChecked="{Binding IsStatisticsChecked, Mode=TwoWay}" Command="{Binding Path=viewCMD}" CommandParameter="Statistics" />
-            </MenuItem>
         </Menu>
-        <StatusBar Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="2" Grid.RowSpan="2" Grid.Row="1" >
+        <StatusBar Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="3" Grid.RowSpan="2" Grid.Row="1" >
             <StatusBarItem>
                 <TextBlock Text="{Binding Status}" />
             </StatusBarItem>
         </StatusBar>
-        <WpfPlot:WpfPlot Name="MyPlot" Grid.Column="1" Grid.RowSpan="1" Grid.Row="1" DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}"/>
-        <TreeView ItemsSource="{Binding Path=TensorKeys}"  Margin="10,0,10,0" Grid.Row="1" VerticalAlignment="Center"  SelectedItemChanged="TreeView_OnSelectedItemChanged" Height="376" />
+        <WpfPlot:WpfPlot Name="MyPlot" Grid.Column="1"  DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" Grid.Row="1" />
+        <WpfPlot:WpfPlot Name="MyPlot1" Grid.Column="2"  DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" Grid.Row="1"/>
+        <TreeView ItemsSource="{Binding Path=TensorKeys}"  Margin="10,10,10,10" Grid.Row="1"  SelectedItemChanged="TreeView_OnSelectedItemChanged" />
     </Grid>
 </Window>

@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using ScottPlot.Plottables;
+using ScottPlot.Statistics;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -36,6 +38,8 @@ namespace SafetensorsViewer
             }
         }
         double[,]? _dataMatrix;
+        Heatmap? heatmap;
+
         public double[,]? DataMatrix {
             get {
                 return _dataMatrix;
@@ -46,34 +50,23 @@ namespace SafetensorsViewer
                     PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(DataMatrix)));
                     _dataMatrix = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DataMatrix)));
-                    MyPlot.Reset();
-                    MyPlot.Plot.ShowLegend();
                     if (value != null)
                     {
-                        if (IsHeatmapChecked)
-                        {
-                            var heatmap = MyPlot.Plot.Add.Heatmap(value);
-                            heatmap.Colormap = new ScottPlot.Colormaps.Turbo();
-                            MyPlot.Plot.Add.ColorBar(heatmap);
+
+                            heatmap ??= MyPlot.Plot.Add.Heatmap(value);
+                            heatmap.Intensities = value;
+                            heatmap.Update();
                             MyPlot.Refresh();
-                        }
-                        else if (IsHistogramChecked)
-                        {
-                            var hist = ScottPlot.Statistics.Histogram.WithBinCount((int)Math.Ceiling(Math.Sqrt(_dataMatrix.Length)), torch.min(LoadedSafetensors).item<double>() - 1e-10, torch.max(LoadedSafetensors).item<double>() + 1e-10);
-                            hist.AddRange(_dataMatrix.Cast<double>());
-                            var histogram = MyPlot.Plot.Add.Histogram(hist);
-                            MyPlot.Plot.XLabel("Value");
-                            MyPlot.Plot.YLabel("Count");
-                            MyPlot.Refresh();
-                        }
-                        else if (IsStatisticsChecked)
-                        {
-                            var mean = torch.mean(LoadedSafetensors).item<double>();
-                            var median = torch.median(LoadedSafetensors).item<double>();
-                            var stddev = torch.std(LoadedSafetensors).item<double>();
-                            var var = torch.var(LoadedSafetensors).item<double>();
-                            MyPlot.Plot.Add.Text($"Mean: {mean:F4}\nMedian: {median:F4}\nStd Dev: {stddev:F4}\nVariance: {var:F4}", 0.05, 0.95);
-                        }
+
+                        MyPlot1.Plot.Clear();
+                        var histogram = ScottPlot.Statistics.Histogram.WithBinCount((int)Math.Ceiling(Math.Sqrt(_dataMatrix.Length)), torch.min(LoadedSafetensors).item<double>() - 1e-5, torch.max(LoadedSafetensors).item<double>() + 1e-5);
+                        histogram.AddRange(_dataMatrix.Cast<double>());
+                        var histogramPlot = MyPlot1.Plot.Add.Histogram(histogram);
+                        MyPlot1.Plot.XLabel("Value");
+                        MyPlot1.Plot.YLabel("Count");
+                        MyPlot1.Refresh();
+
+
                     }
                     Status = "Ready";
                 }
@@ -95,13 +88,13 @@ namespace SafetensorsViewer
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
 
                     Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(tensorpath, [_selectedTensorKey]);
-                    if (t.ContainsKey(_selectedTensorKey))
+                    if (t.TryGetValue(_selectedTensorKey, out torch.Tensor? value1))
                     {
-                        var doubleTensor = t[_selectedTensorKey].to_type(torch.ScalarType.Float64);
+                        torch.Tensor doubleTensor = value1.to_type(torch.ScalarType.Float64);
                         TensorAccessor<double> vv = doubleTensor.data<double>();
                         LoadedSafetensors = doubleTensor;
                         double[,] nativeMatrix = new double[t[_selectedTensorKey].shape.Count() > 0 ? t[_selectedTensorKey].shape[0] : 1, t[_selectedTensorKey].shape.Count() > 1 ? t[_selectedTensorKey].shape[1] : 1];
-                        var targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
+                        Span<double> targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
                         vv.CopyTo(targetSpan);
                         DataMatrix = nativeMatrix;
                     }
@@ -119,93 +112,15 @@ namespace SafetensorsViewer
         public event PropertyChangingEventHandler? PropertyChanging;
 
         public ICommand openCMD => OpenCommand ??= new RelayCommand(CommandOpen, () => true);
-        private bool _isHeatmapChecked = true;
-        private bool _isHistogramChecked;
-        private bool _isStatisticsChecked;
-
-        public bool IsHeatmapChecked
-        {
-            get => _isHeatmapChecked;
-            set
-            {
-                if (_isHeatmapChecked != value)
-                {
-                    _isHeatmapChecked = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHeatmapChecked)));
-                    if (value)
-                    {
-                        IsHistogramChecked = false;
-                        IsStatisticsChecked = false;
-                    }
-                    else if (!IsHistogramChecked && !IsStatisticsChecked)
-                    {
-                        _isHeatmapChecked = true;
-                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHeatmapChecked)));
-                    }
-                }
-            }
-        }
-
-        public bool IsHistogramChecked
-        {
-            get => _isHistogramChecked;
-            set
-            {
-                if (_isHistogramChecked != value)
-                {
-                    _isHistogramChecked = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHistogramChecked)));
-                    if (value)
-                    {
-                        IsHeatmapChecked = false;
-                        IsStatisticsChecked = false;
-                    }
-                    else if (!IsHeatmapChecked && !IsStatisticsChecked)
-                    {
-                        _isHistogramChecked = true;
-                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHistogramChecked)));
-                    }
-                }
-            }
-        }
-
-        public bool IsStatisticsChecked
-        {
-            get => _isStatisticsChecked;
-            set
-            {
-                if (_isStatisticsChecked != value)
-                {
-                    _isStatisticsChecked = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsStatisticsChecked)));
-                    if (value)
-                    {
-                        IsHeatmapChecked = false;
-                        IsHistogramChecked = false;
-                    }
-                    else if (!IsHeatmapChecked && !IsHistogramChecked)
-                    {
-                        _isStatisticsChecked = true;
-                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsStatisticsChecked)));
-                    }
-                }
-            }
-        }
-
-        private RelayCommand<string>? _viewCommand;
-        public ICommand viewCMD => _viewCommand ??= new RelayCommand<string>(CommandView);
-
-        private void CommandView(string? viewType)
-        {
-            if (string.IsNullOrEmpty(viewType)) return;
-            if (viewType == "Heatmap") IsHeatmapChecked = true;
-            else if (viewType == "Histogram") IsHistogramChecked = true;
-            else if (viewType == "Statistics") IsStatisticsChecked = true;
-        }
 
         public MainWindow()
         {
             InitializeComponent();
+            heatmap ??= MyPlot.Plot.Add.Heatmap(new double[,] { { 0.0 } });
+            heatmap.Colormap = new ScottPlot.Colormaps.Turbo();
+            MyPlot.Plot.Add.ColorBar(heatmap);
+            MyPlot.Plot.ShowLegend();
+            Status = "Ready";
         }
         async void CommandOpen()
         {
