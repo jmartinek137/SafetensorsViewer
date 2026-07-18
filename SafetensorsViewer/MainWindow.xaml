@@ -3,16 +3,23 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:SafetensorsViewer" xmlns:WpfPlot="http://schemas.scottplot.net/2008/xaml/presentation"
+        xmlns:local="clr-namespace:SafetensorsViewer"
+        xmlns:converters="clr-namespace:SafetensorsViewer.Converters"
+        xmlns:WpfPlot="http://schemas.scottplot.net/2008/xaml/presentation"
+        xmlns:system="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="900"
         DataContext="{Binding RelativeSource={RelativeSource Self}}"
         Closing="Window_Closing"
 >
+    <Window.Resources>
+        <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="24*"/>
-            <RowDefinition Height="380*"/>
+            <RowDefinition Height="28*"/>
+            <RowDefinition Height="352*"/>
             <RowDefinition Height="24*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -29,13 +36,26 @@
                 <MenuItem Header="Exit" Click="ExitMenuItem_Click"/>
             </MenuItem>
         </Menu>
-        <StatusBar Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="3" Grid.RowSpan="2" Grid.Row="1" >
+        <ToolBar Grid.Row="1" Grid.ColumnSpan="3">
+            <ToggleButton Content="Edit Mode" IsChecked="{Binding IsEditModeEnabled}" IsEnabled="{Binding DataMatrix, Converter={StaticResource NullToBoolConverter}}" />
+            <TextBlock Text="Brush step:" VerticalAlignment="Center" Margin="8,0,2,0"/>
+            <ComboBox Width="80" SelectedItem="{Binding BrushStep}">
+                <ComboBox.Items>
+                    <system:Double>1E-06</system:Double>
+                    <system:Double>1E-05</system:Double>
+                    <system:Double>0.0001</system:Double>
+                    <system:Double>0.001</system:Double>
+                    <system:Double>0.01</system:Double>
+                </ComboBox.Items>
+            </ComboBox>
+        </ToolBar>
+        <StatusBar Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="3" Grid.RowSpan="2" Grid.Row="2" >
             <StatusBarItem>
                 <TextBlock Text="{Binding Status}" />
             </StatusBarItem>
         </StatusBar>
-        <WpfPlot:WpfPlot Name="MyPlot" Grid.Column="1"  DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" Grid.Row="1" />
-        <WpfPlot:WpfPlot Name="MyPlot1" Grid.Column="2"  DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" Grid.Row="1"/>
-        <TreeView ItemsSource="{Binding Path=TensorKeys}"  Margin="10,10,10,10" Grid.Row="1"  SelectedItemChanged="TreeView_OnSelectedItemChanged" />
+        <WpfPlot:WpfPlot Name="MyPlot" Grid.Column="1"  DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" Grid.Row="2" MouseUp="MyPlot_MouseUp" />
+        <WpfPlot:WpfPlot Name="MyPlot1" Grid.Column="2"  DataContext="{Binding Path=DataMatrix, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" Grid.Row="2"/>
+        <TreeView ItemsSource="{Binding Path=TensorKeys}"  Margin="10,10,10,10" Grid.Row="2"  SelectedItemChanged="TreeView_OnSelectedItemChanged" />
     </Grid>
 </Window>
