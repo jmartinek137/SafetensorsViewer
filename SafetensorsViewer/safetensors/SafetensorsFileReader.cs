@@ -1,5 +1,6 @@
 ﻿using System.Buffers.Binary;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using TorchSharp;
@@ -122,6 +123,22 @@ public class SafetensorsFileReader
             _ => throw new NotSupportedException($"Data type '{info.DType}' is not supported.")
         };
 
-        return torch.tensor(data, dtype: scalarType).reshape(info.Shape).to_type(torch.ScalarType.Float64);
+        torch.Tensor tensor = dtype switch
+        {
+            SafetensorsDType.F64 => torch.tensor(MemoryMarshal.Cast<byte, double>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.F32 => torch.tensor(MemoryMarshal.Cast<byte, float>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.F16 or SafetensorsDType.BF16 => torch.tensor(MemoryMarshal.Cast<byte, Half>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.I64 => torch.tensor(MemoryMarshal.Cast<byte, long>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.I32 => torch.tensor(MemoryMarshal.Cast<byte, int>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.I16 => torch.tensor(MemoryMarshal.Cast<byte, short>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.I8 => torch.tensor(MemoryMarshal.Cast<byte, sbyte>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.U8 => torch.tensor(data, dtype: scalarType),
+            SafetensorsDType.BOOL => torch.tensor(data.Select(b => b != 0).ToArray(), dtype: scalarType),
+            SafetensorsDType.Complex64 => throw new NotSupportedException("Complex64 tensors are not supported yet."),
+            SafetensorsDType.Complex32 => throw new NotSupportedException("Complex32 tensors are not supported yet."),
+            _ => throw new NotSupportedException($"Data type '{info.DType}' is not supported.")
+        };
+
+        return tensor.reshape(info.Shape).to_type(torch.ScalarType.Float64);
     }
 }

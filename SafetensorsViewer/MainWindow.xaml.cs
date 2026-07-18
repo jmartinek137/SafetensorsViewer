@@ -119,29 +119,37 @@ namespace SafetensorsViewer
             } set {
                 if (_dataMatrix != value)
                 {
-                    Status = "Rendering data";
-                    PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(DataMatrix)));
-                    _dataMatrix = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DataMatrix)));
-                    if (value != null)
+                    try
                     {
+                        Status = "Rendering data";
+                        PropertyChanging?.Invoke(this, new PropertyChangingEventArgs(nameof(DataMatrix)));
+                        _dataMatrix = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DataMatrix)));
+                        if (value != null)
+                        {
 
-                            heatmap ??= MyPlot.Plot.Add.Heatmap(value);
-                            heatmap.Intensities = value;
-                            heatmap.Update();
-                            MyPlot.Refresh();
+                                heatmap ??= MyPlot.Plot.Add.Heatmap(value);
+                                heatmap.Intensities = value;
+                                heatmap.Update();
+                                MyPlot.Refresh();
 
-                        MyPlot1.Plot.Clear();
-                        var histogram = ScottPlot.Statistics.Histogram.WithBinCount((int)Math.Ceiling(Math.Sqrt(_dataMatrix.Length)), torch.min(LoadedSafetensors).item<double>() - 1e-5, torch.max(LoadedSafetensors).item<double>() + 1e-5);
-                        histogram.AddRange(_dataMatrix.Cast<double>());
-                        var histogramPlot = MyPlot1.Plot.Add.Histogram(histogram);
-                        MyPlot1.Plot.XLabel("Value");
-                        MyPlot1.Plot.YLabel("Count");
-                        MyPlot1.Refresh();
+                            MyPlot1.Plot.Clear();
+                            var histogram = ScottPlot.Statistics.Histogram.WithBinCount((int)Math.Ceiling(Math.Sqrt(_dataMatrix.Length)), torch.min(LoadedSafetensors).item<double>() - 1e-5, torch.max(LoadedSafetensors).item<double>() + 1e-5);
+                            histogram.AddRange(_dataMatrix.Cast<double>());
+                            var histogramPlot = MyPlot1.Plot.Add.Histogram(histogram);
+                            MyPlot1.Plot.XLabel("Value");
+                            MyPlot1.Plot.YLabel("Count");
+                            MyPlot1.Refresh();
 
 
+                        }
+                        Status = "Ready";
                     }
-                    Status = "Ready";
+                    catch (Exception ex)
+                    {
+                        Status = "Error rendering tensor";
+                        MessageBox.Show(this, $"Failed to render tensor data:\n\n{ex.Message}", "Rendering error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
         }
@@ -158,36 +166,46 @@ namespace SafetensorsViewer
                 _selectedTensorKey = value;
                 if (_selectedTensorKey != null)
                 {
-                    Status = "Loading tensor";
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
-
-                    SafetensorsFileReader sfr = new(tensorpath);
-                    SafetensorsDType originalDType = SafetensorsDTypeExtensions.Parse(sfr.GetInfo(_selectedTensorKey).DType);
-                    _originalDTypes[_selectedTensorKey] = originalDType;
-
-                    SafetensorsDType selectedDType = _originalDTypes[_selectedTensorKey];
-                    torch.Tensor tensor = sfr.LoadTensor(_selectedTensorKey);
-
-                    ConfigureBrushStepForDType(selectedDType);
-
-                    // Replay any pending edits for this tensor.
-                    if (PendingEditsByTensor.TryGetValue(_selectedTensorKey, out List<TensorEdit>? edits))
+                    try
                     {
-                        foreach (TensorEdit edit in edits)
+                        Status = "Loading tensor";
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
+
+                        SafetensorsFileReader sfr = new(tensorpath);
+                        SafetensorsDType originalDType = SafetensorsDTypeExtensions.Parse(sfr.GetInfo(_selectedTensorKey).DType);
+                        _originalDTypes[_selectedTensorKey] = originalDType;
+
+                        SafetensorsDType selectedDType = _originalDTypes[_selectedTensorKey];
+                        torch.Tensor tensor = sfr.LoadTensor(_selectedTensorKey);
+
+                        ConfigureBrushStepForDType(selectedDType);
+
+                        // Replay any pending edits for this tensor.
+                        if (PendingEditsByTensor.TryGetValue(_selectedTensorKey, out List<TensorEdit>? edits))
                         {
-                            tensor[edit.Y, edit.X] = torch.tensor(edit.NewValue);
+                            foreach (TensorEdit edit in edits)
+                            {
+                                tensor[edit.Y, edit.X] = torch.tensor(edit.NewValue);
+                            }
                         }
+
+                        LoadedSafetensors = tensor;
+                        TensorAccessor<double> vv = tensor.data<double>();
+                        double[,] nativeMatrix = new double[tensor.shape.Count() > 0 ? tensor.shape[0] : 1, tensor.shape.Count() > 1 ? tensor.shape[1] : 1];
+                        Span<double> targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
+                        vv.CopyTo(targetSpan);
+                        DataMatrix = nativeMatrix;
+
+                        HasChanges = edits is { Count: > 0 };
+                        Status = "Ready";
                     }
-
-                    LoadedSafetensors = tensor;
-                    TensorAccessor<double> vv = tensor.data<double>();
-                    double[,] nativeMatrix = new double[tensor.shape.Count() > 0 ? tensor.shape[0] : 1, tensor.shape.Count() > 1 ? tensor.shape[1] : 1];
-                    Span<double> targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
-                    vv.CopyTo(targetSpan);
-                    DataMatrix = nativeMatrix;
-
-                    HasChanges = edits is { Count: > 0 };
-                    Status = "Ready";
+                    catch (Exception ex)
+                    {
+                        Status = $"Error loading {_selectedTensorKey}";
+                        MessageBox.Show(this, $"Failed to load tensor '{_selectedTensorKey}':\n\n{ex.Message}", "Tensor load error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        DataMatrix = null;
+                        LoadedSafetensors = null;
+                    }
                 }
                 else
                 {
