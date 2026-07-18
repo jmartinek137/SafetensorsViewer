@@ -23,7 +23,7 @@ public class TensorInfo
 public enum SafetensorsDType
 {
     F64, F32, F16, BF16, FP8_E4M3, FP8_E5M2,
-    I64, I32, I16, I8,
+    I64, I32, I16, I8, I4,
     U8, BOOL,
     Complex64, Complex32
 }
@@ -44,6 +44,7 @@ public static class SafetensorsDTypeExtensions
             "I32" => SafetensorsDType.I32,
             "I16" => SafetensorsDType.I16,
             "I8" => SafetensorsDType.I8,
+            "I4" => SafetensorsDType.I4,
             "U8" => SafetensorsDType.U8,
             "BOOL" => SafetensorsDType.BOOL,
             "Complex64" => SafetensorsDType.Complex64,
@@ -66,6 +67,7 @@ public static class SafetensorsDTypeExtensions
             SafetensorsDType.I32 => "I32",
             SafetensorsDType.I16 => "I16",
             SafetensorsDType.I8 => "I8",
+            SafetensorsDType.I4 => "I4",
             SafetensorsDType.U8 => "U8",
             SafetensorsDType.BOOL => "BOOL",
             SafetensorsDType.Complex64 => "Complex64",
@@ -81,7 +83,7 @@ public static class SafetensorsDTypeExtensions
             SafetensorsDType.F64 or SafetensorsDType.Complex64 or SafetensorsDType.I64 => 8,
             SafetensorsDType.F32 or SafetensorsDType.I32 or SafetensorsDType.Complex32 => 4,
             SafetensorsDType.F16 or SafetensorsDType.BF16 or SafetensorsDType.I16 => 2,
-            SafetensorsDType.FP8_E4M3 or SafetensorsDType.FP8_E5M2 or SafetensorsDType.I8 or SafetensorsDType.U8 => 1,
+            SafetensorsDType.FP8_E4M3 or SafetensorsDType.FP8_E5M2 or SafetensorsDType.I8 or SafetensorsDType.U8 or SafetensorsDType.I4 => 1,
             SafetensorsDType.BOOL => 1,
             _ => throw new NotSupportedException($"Data type '{dtype}' has no defined byte size.")
         };

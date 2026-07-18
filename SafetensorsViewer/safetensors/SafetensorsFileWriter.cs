@@ -13,6 +13,7 @@ public class SafetensorsFileWriter
         {
             SafetensorsDType.FP8_E4M3 => ConvertToFP8(tensor, FP8Converters.DoubleToE4M3),
             SafetensorsDType.FP8_E5M2 => ConvertToFP8(tensor, FP8Converters.DoubleToE5M2),
+            SafetensorsDType.I4 => ConvertToI4(tensor),
             _ => tensor.to_type(MapToTorchSharpType(originalDType)).bytes.ToArray()
         };
 
@@ -51,6 +52,29 @@ public class SafetensorsFileWriter
             for (int i = 0; i < count; i++)
             {
                 result[i] = converter(accessor[i]);
+            }
+        }
+        return result;
+    }
+
+    static byte[] ConvertToI4(torch.Tensor tensor)
+    {
+        torch.Tensor flatTensor = tensor.to_type(torch.ScalarType.Float64).flatten();
+        long count = flatTensor.numel();
+        byte[] result = new byte[(count + 1) / 2];
+        using (TensorAccessor<double> accessor = flatTensor.data<double>())
+        {
+            for (int i = 0; i < count; i++)
+            {
+                byte nibble = INT4Converters.DoubleToNibble(accessor[i]);
+                if (i % 2 == 0)
+                {
+                    result[i / 2] = nibble;
+                }
+                else
+                {
+                    result[i / 2] |= (byte)(nibble << 4);
+                }
             }
         }
         return result;

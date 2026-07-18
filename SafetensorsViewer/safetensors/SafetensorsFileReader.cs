@@ -80,7 +80,6 @@ public class SafetensorsFileReader
         SafetensorsDType dtype = SafetensorsDTypeExtensions.Parse(info.DType);
         byte[] data = GetTensorData(key);
 
-        // FP8 is not supported directly by TorchSharp, so load as float64 for editing.
         if (dtype is SafetensorsDType.FP8_E4M3 or SafetensorsDType.FP8_E5M2)
         {
             double[] values = new double[data.Length];
@@ -89,6 +88,19 @@ public class SafetensorsFileReader
                 values[i] = dtype == SafetensorsDType.FP8_E4M3
                     ? FP8Converters.E4M3ToDouble(data[i])
                     : FP8Converters.E5M2ToDouble(data[i]);
+            }
+            return torch.tensor(values, dtype: torch.ScalarType.Float64).reshape(info.Shape);
+        }
+
+        if (dtype == SafetensorsDType.I4)
+        {
+            long elementCount = info.Shape.Aggregate(1L, (a, b) => a * b);
+            double[] values = new double[elementCount];
+            for (int i = 0; i < elementCount; i++)
+            {
+                byte b = data[i / 2];
+                int nibble = (i % 2 == 0) ? (b & 0x0F) : ((b >> 4) & 0x0F);
+                values[i] = INT4Converters.NibbleToDouble((byte)nibble);
             }
             return torch.tensor(values, dtype: torch.ScalarType.Float64).reshape(info.Shape);
         }

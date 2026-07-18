@@ -100,6 +100,17 @@ namespace SafetensorsViewer
             }
         }
 
+        ObservableCollection<double> _brushStepOptions = new() { 1E-06, 1E-05, 0.0001, 0.001, 0.01, 0.1, 1.0 };
+        public ObservableCollection<double> BrushStepOptions
+        {
+            get => _brushStepOptions;
+            set
+            {
+                _brushStepOptions = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BrushStepOptions)));
+            }
+        }
+
         public Dictionary<string, List<TensorEdit>> PendingEditsByTensor { get; } = new Dictionary<string, List<TensorEdit>>();
 
         public double[,]? DataMatrix {
@@ -154,7 +165,10 @@ namespace SafetensorsViewer
                     SafetensorsDType originalDType = SafetensorsDTypeExtensions.Parse(sfr.GetInfo(_selectedTensorKey).DType);
                     _originalDTypes[_selectedTensorKey] = originalDType;
 
+                    SafetensorsDType selectedDType = _originalDTypes[_selectedTensorKey];
                     torch.Tensor tensor = sfr.LoadTensor(_selectedTensorKey);
+
+                    ConfigureBrushStepForDType(selectedDType);
 
                     // Replay any pending edits for this tensor.
                     if (PendingEditsByTensor.TryGetValue(_selectedTensorKey, out List<TensorEdit>? edits))
@@ -335,6 +349,8 @@ namespace SafetensorsViewer
                 TensorKeys.Clear();
                 PendingEditsByTensor.Clear();
                 _originalDTypes.Clear();
+                BrushStepOptions = new ObservableCollection<double> { 1E-06, 1E-05, 0.0001, 0.001, 0.01, 0.1, 1.0 };
+                BrushStep = 1E-05;
                 Status = "Building tensor key tree";
                 Dictionary<string, TreeViewItem> nodes = new();
                 TreeViewItem? parent;
@@ -419,6 +435,26 @@ namespace SafetensorsViewer
         void MyPlot_MouseUp(object sender, MouseButtonEventArgs e)
         {
             _isPainting = false;
+        }
+
+        void ConfigureBrushStepForDType(SafetensorsDType dtype)
+        {
+            switch (dtype)
+            {
+                case SafetensorsDType.I4:
+                    BrushStepOptions = new ObservableCollection<double> { 0.01, 0.05, 0.1, 0.2, 0.5, 1.0 };
+                    BrushStep = 0.1;
+                    break;
+                case SafetensorsDType.FP8_E4M3:
+                case SafetensorsDType.FP8_E5M2:
+                    BrushStepOptions = new ObservableCollection<double> { 1E-05, 5E-05, 1E-04, 1E-03, 1E-02, 1E-01 };
+                    BrushStep = 1E-04;
+                    break;
+                default:
+                    BrushStepOptions = new ObservableCollection<double> { 1E-06, 1E-05, 1E-04, 1E-03, 1E-02, 1E-01 };
+                    BrushStep = 1E-05;
+                    break;
+            }
         }
 
         void ApplyBrushAtMousePosition(Point mousePosition, bool increase)
