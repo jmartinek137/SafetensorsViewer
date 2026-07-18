@@ -41,6 +41,8 @@ namespace SafetensorsViewer
         double[,]? _dataMatrix;
         Heatmap? heatmap;
 
+        Dictionary<string, SafetensorsDType> _originalDTypes = new();
+
         string _status = string.Empty;
         public string Status
         {
@@ -148,15 +150,11 @@ namespace SafetensorsViewer
                     Status = "Loading tensor";
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
 
-                    Dictionary<string, torch.Tensor> t = TorchSharp.PyBridge.Safetensors.LoadStateDict(tensorpath, [_selectedTensorKey]);
-                    if (!t.TryGetValue(_selectedTensorKey, out torch.Tensor? loaded))
-                    {
-                        Status = "Ready";
-                        DataMatrix = null;
-                        return;
-                    }
+                    SafetensorsFileReader sfr = new(tensorpath);
+                    SafetensorsDType originalDType = SafetensorsDTypeExtensions.Parse(sfr.GetInfo(_selectedTensorKey).DType);
+                    _originalDTypes[_selectedTensorKey] = originalDType;
 
-                    torch.Tensor tensor = loaded.to_type(torch.ScalarType.Float64);
+                    torch.Tensor tensor = sfr.LoadTensor(_selectedTensorKey);
 
                     // Replay any pending edits for this tensor.
                     if (PendingEditsByTensor.TryGetValue(_selectedTensorKey, out List<TensorEdit>? edits))
@@ -311,7 +309,8 @@ namespace SafetensorsViewer
             if (LoadedSafetensors is null || SelectedTensorKey is null)
                 return;
 
-            SafetensorsFileWriter.SaveTensor(filePath, SelectedTensorKey, LoadedSafetensors.clone());
+            SafetensorsDType originalDType = _originalDTypes.GetValueOrDefault(SelectedTensorKey, SafetensorsDType.F64);
+            SafetensorsFileWriter.SaveTensor(filePath, SelectedTensorKey, LoadedSafetensors.clone(), originalDType);
             PendingEditsByTensor.Remove(SelectedTensorKey);
         }
 
@@ -335,6 +334,7 @@ namespace SafetensorsViewer
 
                 TensorKeys.Clear();
                 PendingEditsByTensor.Clear();
+                _originalDTypes.Clear();
                 Status = "Building tensor key tree";
                 Dictionary<string, TreeViewItem> nodes = new();
                 TreeViewItem? parent;

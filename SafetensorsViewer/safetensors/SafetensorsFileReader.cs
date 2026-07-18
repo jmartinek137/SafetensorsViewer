@@ -1,11 +1,15 @@
-﻿using System.IO;
+﻿using System.Buffers.Binary;
+using System.IO;
 using System.Text;
 using System.Text.Json;
+using TorchSharp;
+using TorchSharp.Utils;
 
 public class SafetensorsFileReader
 {
     private Dictionary<string, TensorInfo> _tensorRegistry = new();
     private string _currentFilePath = string.Empty;
+    private long _binaryDataStartOffset;
 
     public Dictionary<string, TensorInfo> TensorRegistry => _tensorRegistry;
 
@@ -27,7 +31,7 @@ public class SafetensorsFileReader
         }
         string jsonText = Encoding.UTF8.GetString(headerBytes);
 
-        long binaryDataStartOffset = 8 + (long)headerLength;
+        _binaryDataStartOffset = 8 + (long)headerLength;
 
         using JsonDocument doc = JsonDocument.Parse(jsonText);
         foreach (JsonProperty property in doc.RootElement.EnumerateObject())
@@ -38,8 +42,8 @@ public class SafetensorsFileReader
 
             if (info.DataOffsets != null && info.DataOffsets.Length >= 2)
             {
-                info.DataOffsets[0] += binaryDataStartOffset;
-                info.DataOffsets[1] += binaryDataStartOffset;
+                info.DataOffsets[0] += _binaryDataStartOffset;
+                info.DataOffsets[1] += _binaryDataStartOffset;
             }
 
             _tensorRegistry.Add(property.Name, info);
@@ -48,13 +52,18 @@ public class SafetensorsFileReader
 
     public string[] Keys { get { return _tensorRegistry.Keys.ToArray(); } }
 
-    public byte[] GetTensor(string key)
+    public TensorInfo GetInfo(string key)
     {
         if (!_tensorRegistry.ContainsKey(key))
         {
             throw new KeyNotFoundException($"Tensor with key '{key}' not found.");
         }
-        TensorInfo info = _tensorRegistry[key];
+        return _tensorRegistry[key];
+    }
+
+    public byte[] GetTensorData(string key)
+    {
+        TensorInfo info = GetInfo(key);
         long dataLength = info.DataOffsets[1] - info.DataOffsets[0];
         byte[] tensorData = new byte[dataLength];
         using (FileStream fs = new(_currentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -63,5 +72,44 @@ public class SafetensorsFileReader
             fs.ReadExactly(tensorData, 0, (int)dataLength);
         }
         return tensorData;
+    }
+
+    public torch.Tensor LoadTensor(string key)
+    {
+        TensorInfo info = GetInfo(key);
+        SafetensorsDType dtype = SafetensorsDTypeExtensions.Parse(info.DType);
+        byte[] data = GetTensorData(key);
+
+        // FP8 is not supported directly by TorchSharp, so load as float64 for editing.
+        if (dtype is SafetensorsDType.FP8_E4M3 or SafetensorsDType.FP8_E5M2)
+        {
+            double[] values = new double[data.Length];
+            for (int i = 0; i < data.Length; i++)
+            {
+                values[i] = dtype == SafetensorsDType.FP8_E4M3
+                    ? FP8Converters.E4M3ToDouble(data[i])
+                    : FP8Converters.E5M2ToDouble(data[i]);
+            }
+            return torch.tensor(values, dtype: torch.ScalarType.Float64).reshape(info.Shape);
+        }
+
+        torch.ScalarType scalarType = dtype switch
+        {
+            SafetensorsDType.F64 => torch.ScalarType.Float64,
+            SafetensorsDType.F32 => torch.ScalarType.Float32,
+            SafetensorsDType.F16 => torch.ScalarType.Float16,
+            SafetensorsDType.BF16 => torch.ScalarType.BFloat16,
+            SafetensorsDType.I64 => torch.ScalarType.Int64,
+            SafetensorsDType.I32 => torch.ScalarType.Int32,
+            SafetensorsDType.I16 => torch.ScalarType.Int16,
+            SafetensorsDType.I8 => torch.ScalarType.Int8,
+            SafetensorsDType.U8 => torch.ScalarType.Byte,
+            SafetensorsDType.BOOL => torch.ScalarType.Bool,
+            SafetensorsDType.Complex64 => torch.ScalarType.ComplexFloat64,
+            SafetensorsDType.Complex32 => torch.ScalarType.ComplexFloat32,
+            _ => throw new NotSupportedException($"Data type '{info.DType}' is not supported.")
+        };
+
+        return torch.tensor(data, dtype: scalarType).reshape(info.Shape).to_type(torch.ScalarType.Float64);
     }
 }
