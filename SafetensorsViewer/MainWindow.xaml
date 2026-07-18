@@ -7,6 +7,7 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="900"
         DataContext="{Binding RelativeSource={RelativeSource Self}}"
+        Closing="Window_Closing"
 >
     <Grid>
         <Grid.RowDefinitions>
@@ -22,9 +23,10 @@
         <Menu Height="25" VerticalAlignment="Center" Grid.ColumnSpan="3">
             <MenuItem Header="File">
                 <MenuItem Header="Open" Command="{Binding Path=openCMD}"/>
-                <MenuItem Header="Save" />
+                <MenuItem Header="Save" Command="{Binding Path=saveCMD}"/>
+                <MenuItem Header="Save As..." Command="{Binding Path=saveAsCMD}"/>
                 <Separator />
-                <MenuItem Header="Exit" />
+                <MenuItem Header="Exit" Click="ExitMenuItem_Click"/>
             </MenuItem>
         </Menu>
         <StatusBar Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="3" Grid.RowSpan="2" Grid.Row="1" >
