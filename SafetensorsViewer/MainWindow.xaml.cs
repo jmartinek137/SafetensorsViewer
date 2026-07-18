@@ -40,6 +40,7 @@ namespace SafetensorsViewer
         }
         double[,]? _dataMatrix;
         Heatmap? heatmap;
+        long[]? _originalTensorShape;
 
         Dictionary<string, SafetensorsDType> _originalDTypes = new();
 
@@ -180,19 +181,27 @@ namespace SafetensorsViewer
 
                         ConfigureBrushStepForDType(selectedDType);
 
+                        _originalTensorShape = tensor.shape.ToArray();
+
+                        // Normalize the tensor to 2D so the heatmap and brush edits always operate
+                        // on a consistent [rows, cols] layout, while sharing the same underlying storage.
+                        int rows = tensor.ndim > 0 ? (int)tensor.shape[0] : 1;
+                        int cols = tensor.ndim > 1 ? (int)tensor.shape[1] : 1;
+                        torch.Tensor editableTensor = tensor.reshape(rows, cols);
+
                         // Replay any pending edits for this tensor.
                         if (PendingEditsByTensor.TryGetValue(_selectedTensorKey, out List<TensorEdit>? edits))
                         {
                             foreach (TensorEdit edit in edits)
                             {
-                                tensor[edit.Y, edit.X] = torch.tensor(edit.NewValue);
+                                editableTensor[edit.Y, edit.X] = torch.tensor(edit.NewValue);
                             }
                         }
 
-                        LoadedSafetensors = tensor;
-                        TensorAccessor<double> vv = tensor.data<double>();
-                        double[,] nativeMatrix = new double[tensor.shape.Count() > 0 ? tensor.shape[0] : 1, tensor.shape.Count() > 1 ? tensor.shape[1] : 1];
-                        Span<double> targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], nativeMatrix.GetLength(0) * nativeMatrix.GetLength(1));
+                        LoadedSafetensors = editableTensor;
+                        TensorAccessor<double> vv = editableTensor.data<double>();
+                        double[,] nativeMatrix = new double[rows, cols];
+                        Span<double> targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], rows * cols);
                         vv.CopyTo(targetSpan);
                         DataMatrix = nativeMatrix;
 
@@ -205,6 +214,7 @@ namespace SafetensorsViewer
                         MessageBox.Show(this, $"Failed to load tensor '{_selectedTensorKey}':\n\n{ex.Message}", "Tensor load error", MessageBoxButton.OK, MessageBoxImage.Error);
                         DataMatrix = null;
                         LoadedSafetensors = null;
+                        _originalTensorShape = null;
                     }
                 }
                 else
@@ -342,7 +352,13 @@ namespace SafetensorsViewer
                 return;
 
             SafetensorsDType originalDType = _originalDTypes.GetValueOrDefault(SelectedTensorKey, SafetensorsDType.F64);
-            SafetensorsFileWriter.SaveTensor(filePath, SelectedTensorKey, LoadedSafetensors.clone(), originalDType);
+
+            // Restore the original tensor shape before writing so the file format stays correct.
+            torch.Tensor tensorToSave = _originalTensorShape is not null
+                ? LoadedSafetensors.reshape(_originalTensorShape)
+                : LoadedSafetensors;
+
+            SafetensorsFileWriter.SaveTensor(filePath, SelectedTensorKey, tensorToSave.clone(), originalDType);
             PendingEditsByTensor.Remove(SelectedTensorKey);
         }
 
@@ -496,6 +512,7 @@ namespace SafetensorsViewer
             DataMatrix[dataY, x] = newValue;
 
             // Keep the underlying tensor in sync so the edit is visible immediately.
+            // LoadedSafetensors is always a 2D view of the loaded tensor, so any shape is safe.
             if (LoadedSafetensors is not null)
             {
                 LoadedSafetensors[dataY, x] = torch.tensor(newValue);

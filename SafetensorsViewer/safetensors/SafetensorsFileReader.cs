@@ -75,6 +75,20 @@ public class SafetensorsFileReader
         return tensorData;
     }
 
+    static torch.Tensor ConvertBF16ToFloat64(byte[] data)
+    {
+        // BF16 values are stored as 16-bit unsigned integers. They share the same
+        // sign/exponent layout as float32, but only keep the upper 7 bits of the mantissa.
+        // Shifting left by 16 produces a valid float32 with the lower mantissa bits zeroed.
+        ReadOnlySpan<ushort> bf16Values = MemoryMarshal.Cast<byte, ushort>(data);
+        float[] floatValues = new float[bf16Values.Length];
+        for (int i = 0; i < bf16Values.Length; i++)
+        {
+            floatValues[i] = BitConverter.UInt32BitsToSingle((uint)bf16Values[i] << 16);
+        }
+        return torch.tensor(floatValues, dtype: torch.ScalarType.Float64);
+    }
+
     public torch.Tensor LoadTensor(string key)
     {
         TensorInfo info = GetInfo(key);
@@ -127,7 +141,8 @@ public class SafetensorsFileReader
         {
             SafetensorsDType.F64 => torch.tensor(MemoryMarshal.Cast<byte, double>(data).ToArray(), dtype: scalarType),
             SafetensorsDType.F32 => torch.tensor(MemoryMarshal.Cast<byte, float>(data).ToArray(), dtype: scalarType),
-            SafetensorsDType.F16 or SafetensorsDType.BF16 => torch.tensor(MemoryMarshal.Cast<byte, Half>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.F16 => torch.tensor(MemoryMarshal.Cast<byte, Half>(data).ToArray(), dtype: scalarType),
+            SafetensorsDType.BF16 => ConvertBF16ToFloat64(data),
             SafetensorsDType.I64 => torch.tensor(MemoryMarshal.Cast<byte, long>(data).ToArray(), dtype: scalarType),
             SafetensorsDType.I32 => torch.tensor(MemoryMarshal.Cast<byte, int>(data).ToArray(), dtype: scalarType),
             SafetensorsDType.I16 => torch.tensor(MemoryMarshal.Cast<byte, short>(data).ToArray(), dtype: scalarType),
