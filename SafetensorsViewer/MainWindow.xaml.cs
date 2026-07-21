@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using ScottPlot;
 using ScottPlot.Plottables;
@@ -154,6 +154,7 @@ namespace SafetensorsViewer
                 }
             }
         }
+        private SafetensorsFileReader? _sfr;
         private string? _selectedTensorKey;
 
         public string? SelectedTensorKey
@@ -172,14 +173,51 @@ namespace SafetensorsViewer
                         Status = "Loading tensor";
                         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTensorKey)));
 
-                        SafetensorsFileReader sfr = new(tensorpath);
-                        SafetensorsDType originalDType = SafetensorsDTypeExtensions.Parse(sfr.GetInfo(_selectedTensorKey).DType);
-                        _originalDTypes[_selectedTensorKey] = originalDType;
+                        _sfr ??= new SafetensorsFileReader(tensorpath);
+                        SafetensorsFileReader sfr = _sfr;
+                        torch.Tensor tensor;
+                        bool isComputedDelta = false;
 
-                        SafetensorsDType selectedDType = _originalDTypes[_selectedTensorKey];
-                        torch.Tensor tensor = sfr.LoadTensor(_selectedTensorKey);
+                        // Check if selected key/prefix forms an adapter (LoRA, LoHa, LoKr, or Full Rank LoKr)
+                        var adapterInfo = DeltaMatrixCalculator.DetectAdapter(_selectedTensorKey, sfr.Keys, sfr);
+                        if (adapterInfo.Type != DeltaMatrixCalculator.AdapterType.None)
+                        {
+                            // Diagnostic: show raw bytes of the alpha tensor so we can see its actual content
+                            string alphaFullKey = _selectedTensorKey + ".alpha";
+                            string alphaDiag = "no alpha key";
+                            if (sfr.TensorRegistry.ContainsKey(alphaFullKey))
+                            {
+                                try
+                                {
+                                    TensorInfo alphaInfo = sfr.GetInfo(alphaFullKey);
+                                    byte[] alphaRaw = sfr.GetTensorData(alphaFullKey);
+                                    string alphaHex = BitConverter.ToString(alphaRaw);
+                                    long alphaElemCount = alphaInfo.Shape.Length == 0 ? 1L : alphaInfo.Shape.Aggregate(1L, (a, b) => a * b);
+                                    alphaDiag = $"dtype={alphaInfo.DType}, shape=[{string.Join(",", alphaInfo.Shape)}], nelem={alphaElemCount}, bytes={alphaHex}, computed_alpha={adapterInfo.Alpha}";
+                                }
+                                catch (Exception ex) { alphaDiag = $"error: {ex.Message}"; }
+                            }
+                            Status = $"Alpha diagnostic: {alphaDiag}";
 
-                        ConfigureBrushStepForDType(selectedDType);
+                            tensor = DeltaMatrixCalculator.ComputeDelta(adapterInfo, sfr);
+                            isComputedDelta = true;
+                            _originalDTypes[_selectedTensorKey] = SafetensorsDType.F64;
+                            ConfigureBrushStepForDType(SafetensorsDType.F64);
+                        }
+                        else if (sfr.TensorRegistry.ContainsKey(_selectedTensorKey))
+                        {
+                            SafetensorsDType originalDType = SafetensorsDTypeExtensions.Parse(sfr.GetInfo(_selectedTensorKey).DType);
+                            _originalDTypes[_selectedTensorKey] = originalDType;
+
+                            SafetensorsDType selectedDType = _originalDTypes[_selectedTensorKey];
+                            tensor = sfr.LoadTensor(_selectedTensorKey);
+
+                            ConfigureBrushStepForDType(selectedDType);
+                        }
+                        else
+                        {
+                            throw new KeyNotFoundException($"Key or adapter node '{_selectedTensorKey}' was not found in file.");
+                        }
 
                         _originalTensorShape = tensor.shape.ToArray();
 
@@ -199,14 +237,19 @@ namespace SafetensorsViewer
                         }
 
                         LoadedSafetensors = editableTensor;
-                        TensorAccessor<double> vv = editableTensor.data<double>();
+                        double[] flatData = editableTensor.data<double>().ToArray();
                         double[,] nativeMatrix = new double[rows, cols];
-                        Span<double> targetSpan = MemoryMarshal.CreateSpan(ref nativeMatrix[0, 0], rows * cols);
-                        vv.CopyTo(targetSpan);
+                        for (int r = 0; r < rows; r++)
+                        {
+                            for (int c = 0; c < cols; c++)
+                            {
+                                nativeMatrix[r, c] = flatData[r * cols + c];
+                            }
+                        }
                         DataMatrix = nativeMatrix;
 
                         HasChanges = edits is { Count: > 0 };
-                        Status = "Ready";
+                        Status = isComputedDelta ? $"Computed {adapterInfo.Type} Delta for {_selectedTensorKey} (alpha={adapterInfo.Alpha}) | {(sfr.TensorRegistry.ContainsKey(_selectedTensorKey + ".alpha") ? "alphaDiag=" + BitConverter.ToString(sfr.GetTensorData(_selectedTensorKey + ".alpha")) + " dtype=" + sfr.GetInfo(_selectedTensorKey + ".alpha").DType : "no-alpha-key")}" : "Ready";
                     }
                     catch (Exception ex)
                     {
@@ -362,6 +405,8 @@ namespace SafetensorsViewer
             PendingEditsByTensor.Remove(SelectedTensorKey);
         }
 
+        private HashSet<string> _availableFileKeys = new();
+
         async void CommandOpen()
         {
             if (!PromptSaveUnsavedChanges())
@@ -379,6 +424,10 @@ namespace SafetensorsViewer
                 SaveAsCommand?.NotifyCanExecuteChanged();
                 Title = $"SafetensorsViewer - {Path.GetFileName(tensorpath)}";
                 SafetensorsFileReader sfr = new(tensorpath);
+                _sfr = sfr;
+
+                // Uložení reálných klíčů pro kontrolu v SelectedTensorKey setteru
+                _availableFileKeys = new HashSet<string>(sfr.Keys);
 
                 TensorKeys.Clear();
                 PendingEditsByTensor.Clear();
@@ -388,11 +437,11 @@ namespace SafetensorsViewer
                 Status = "Building tensor key tree";
                 Dictionary<string, TreeViewItem> nodes = new();
                 TreeViewItem? parent;
+
                 foreach (string key in sfr.Keys)
                 {
                     string[] parts = key.Split('.');
                     string path = "";
-
                     parent = null;
 
                     foreach (string part in parts)
@@ -401,7 +450,7 @@ namespace SafetensorsViewer
 
                         if (!nodes.TryGetValue(path, out TreeViewItem? node))
                         {
-                            node = new TreeViewItem { Header = part };
+                            node = new TreeViewItem { Header = part, Tag = path };
                             nodes[path] = node;
 
                             if (parent == null)
@@ -412,12 +461,12 @@ namespace SafetensorsViewer
 
                         parent = node;
                     }
-                    parent.Tag = key;
                 }
                 HasChanges = false;
                 Status = "Ready";
             }
         }
+
         void TreeView_OnSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
             if (e.NewValue is TreeViewItem selectedKey)
