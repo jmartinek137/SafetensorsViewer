@@ -132,18 +132,16 @@ public class SafetensorsFileReader
             return torch.tensor(int4Values, dtype: torch.ScalarType.Float64).reshape(info.Shape);
         }
 
-        // For a dim-0 (scalar) tensor, some writers store data_offsets=[x,x] (zero-length).
-        // In that case data will be empty even though the tensor has 1 element.
-        // Try reading the element-byte-size worth of bytes at the RAW JSON offset (before
-        // _binaryDataStartOffset was added) treated as an absolute file position.
+        // Read from the tensor data section. DataOffsets are relocated to absolute
+        // file offsets in the constructor; using the original raw offset reads header
+        // JSON bytes and produces a bogus scalar value.
         if (data.Length == 0 && (info.Shape == null || info.Shape.Length == 0))
         {
             int elemBytes = dtype.ByteSize();
-            // raw offset = current relocated offset minus the header shift
-            long rawOffset = info.DataOffsets[0] - _binaryDataStartOffset;
-            if (rawOffset >= 0)
+            long dataOffset = info.DataOffsets[0];
+            if (dataOffset >= _binaryDataStartOffset)
             {
-                try { data = ReadBytesAt(rawOffset, elemBytes); } catch { }
+                try { data = ReadBytesAt(dataOffset, elemBytes); } catch { }
             }
         }
 
