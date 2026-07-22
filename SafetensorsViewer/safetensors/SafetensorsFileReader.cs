@@ -132,25 +132,6 @@ public class SafetensorsFileReader
             return torch.tensor(int4Values, dtype: torch.ScalarType.Float64).reshape(info.Shape);
         }
 
-        // Read from the tensor data section. DataOffsets are relocated to absolute
-        // file offsets in the constructor; using the original raw offset reads header
-        // JSON bytes and produces a bogus scalar value.
-        if (data.Length == 0 && (info.Shape == null || info.Shape.Length == 0))
-        {
-            int elemBytes = dtype.ByteSize();
-            long dataOffset = info.DataOffsets[0];
-            if (dataOffset >= _binaryDataStartOffset)
-            {
-                try { data = ReadBytesAt(dataOffset, elemBytes); } catch { }
-            }
-        }
-
-        if (data.Length == 0)
-        {
-            // Nothing readable – return a scalar 0 so callers can detect numel==1 safely.
-            return torch.zeros([], dtype: torch.ScalarType.Float64);
-        }
-
         double[] values = dtype switch
         {
             SafetensorsDType.F64 => MemoryMarshal.Cast<byte, double>(data).ToArray(),
