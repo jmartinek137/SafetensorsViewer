@@ -42,7 +42,7 @@ namespace SafetensorsViewer
         Heatmap? heatmap;
         long[]? _originalTensorShape;
 
-        Dictionary<string, SafetensorsDType> _originalDTypes = new();
+        Dictionary<string, SafetensorsDType> _originalDTypes = [];
 
         string _status = string.Empty;
         public string Status
@@ -101,7 +101,7 @@ namespace SafetensorsViewer
             }
         }
 
-        ObservableCollection<double> _brushStepOptions = new() { 1E-06, 1E-05, 0.0001, 0.001, 0.01, 0.1, 1.0 };
+        ObservableCollection<double> _brushStepOptions = [1E-06, 1E-05, 0.0001, 0.001, 0.01, 0.1, 1.0];
         public ObservableCollection<double> BrushStepOptions
         {
             get => _brushStepOptions;
@@ -112,7 +112,7 @@ namespace SafetensorsViewer
             }
         }
 
-        public Dictionary<string, List<TensorEdit>> PendingEditsByTensor { get; } = new Dictionary<string, List<TensorEdit>>();
+        public Dictionary<string, List<TensorEdit>> PendingEditsByTensor { get; } = [];
 
         public double[,]? DataMatrix {
             get {
@@ -266,7 +266,7 @@ namespace SafetensorsViewer
                 }
             }
         }
-        public ObservableCollection<TreeViewItem> TensorKeys { get; set; } = new ObservableCollection<TreeViewItem>();
+        public ObservableCollection<TreeViewItem> TensorKeys { get; set; } = [];
         public RelayCommand? OpenCommand;
         public RelayCommand? SaveCommand;
         public RelayCommand? SaveAsCommand;
@@ -405,7 +405,7 @@ namespace SafetensorsViewer
             PendingEditsByTensor.Remove(SelectedTensorKey);
         }
 
-        private HashSet<string> _availableFileKeys = new();
+        private HashSet<string> _availableFileKeys = [];
 
         async void CommandOpen()
         {
@@ -432,10 +432,10 @@ namespace SafetensorsViewer
                 TensorKeys.Clear();
                 PendingEditsByTensor.Clear();
                 _originalDTypes.Clear();
-                BrushStepOptions = new ObservableCollection<double> { 1E-06, 1E-05, 0.0001, 0.001, 0.01, 0.1, 1.0 };
+                BrushStepOptions = [1E-06, 1E-05, 0.0001, 0.001, 0.01, 0.1, 1.0];
                 BrushStep = 1E-05;
                 Status = "Building tensor key tree";
-                Dictionary<string, TreeViewItem> nodes = new();
+                Dictionary<string, TreeViewItem> nodes = [];
                 TreeViewItem? parent;
 
                 foreach (string key in sfr.Keys)
@@ -525,16 +525,16 @@ namespace SafetensorsViewer
             switch (dtype)
             {
                 case SafetensorsDType.I4:
-                    BrushStepOptions = new ObservableCollection<double> { 0.01, 0.05, 0.1, 0.2, 0.5, 1.0 };
+                    BrushStepOptions = [0.01, 0.05, 0.1, 0.2, 0.5, 1.0];
                     BrushStep = 0.1;
                     break;
                 case SafetensorsDType.FP8_E4M3:
                 case SafetensorsDType.FP8_E5M2:
-                    BrushStepOptions = new ObservableCollection<double> { 1E-05, 5E-05, 1E-04, 1E-03, 1E-02, 1E-01 };
+                    BrushStepOptions = [1E-05, 5E-05, 1E-04, 1E-03, 1E-02, 1E-01];
                     BrushStep = 1E-04;
                     break;
                 default:
-                    BrushStepOptions = new ObservableCollection<double> { 1E-06, 1E-05, 1E-04, 1E-03, 1E-02, 1E-01 };
+                    BrushStepOptions = [1E-06, 1E-05, 1E-04, 1E-03, 1E-02, 1E-01];
                     BrushStep = 1E-05;
                     break;
             }
@@ -571,7 +571,7 @@ namespace SafetensorsViewer
             {
                 if (!PendingEditsByTensor.TryGetValue(SelectedTensorKey, out List<TensorEdit>? edits))
                 {
-                    edits = new List<TensorEdit>();
+                    edits = [];
                     PendingEditsByTensor[SelectedTensorKey] = edits;
                 }
                 edits.Add(new TensorEdit(x, dataY, newValue));

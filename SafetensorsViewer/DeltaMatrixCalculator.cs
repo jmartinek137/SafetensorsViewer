@@ -27,12 +27,12 @@ namespace SafetensorsViewer
             // load that specific tensor directly without computing a combined delta matrix.
             if (allKeys.Contains(pathPrefix, StringComparer.OrdinalIgnoreCase))
             {
-                return new AdapterInfo(AdapterType.None, pathPrefix, new(), 1.0, 1);
+                return new AdapterInfo(AdapterType.None, pathPrefix, [], 1.0, 1);
             }
 
             var keys = allKeys.Where(k => k.StartsWith(pathPrefix, StringComparison.OrdinalIgnoreCase)).ToList();
             if (keys.Count == 0 && !allKeys.Any(k => k.StartsWith(pathPrefix + ".", StringComparison.OrdinalIgnoreCase))) 
-                return new AdapterInfo(AdapterType.None, pathPrefix, new(), 1.0, 1);
+                return new AdapterInfo(AdapterType.None, pathPrefix, [], 1.0, 1);
 
             string basePrefix = pathPrefix.TrimEnd('.');
             string[] prefixCandidates = new[] { basePrefix };
@@ -78,7 +78,7 @@ namespace SafetensorsViewer
                 }
             }
 
-            return new AdapterInfo(AdapterType.None, pathPrefix, new(), 1.0, 1);
+            return new AdapterInfo(AdapterType.None, pathPrefix, [], 1.0, 1);
         }
 
         private static bool HasAny(Dictionary<string, string> subkeyMap, params string[] keys)
@@ -88,7 +88,7 @@ namespace SafetensorsViewer
 
         private static bool IsMatch(Dictionary<string, string> subkeyMap, out Dictionary<string, string> matched, params string[] requiredRoles)
         {
-            matched = new Dictionary<string, string>();
+            matched = [];
             foreach (var role in requiredRoles)
             {
                 string? foundKey = subkeyMap.Keys.FirstOrDefault(k =>
@@ -105,7 +105,7 @@ namespace SafetensorsViewer
 
         private static bool IsMatchLora(Dictionary<string, string> subkeyMap, out Dictionary<string, string> matched)
         {
-            matched = new Dictionary<string, string>();
+            matched = [];
 
             string? downKey = subkeyMap.Keys.FirstOrDefault(k =>
                 k.Equals("lora_down.weight", StringComparison.OrdinalIgnoreCase) ||

@@ -6,7 +6,7 @@ using TorchSharp;
 
 public class SafetensorsFileReader
 {
-    private Dictionary<string, TensorInfo> _tensorRegistry = new();
+    private Dictionary<string, TensorInfo> _tensorRegistry = [];
     private string _currentFilePath = string.Empty;
     private long _binaryDataStartOffset;
 
