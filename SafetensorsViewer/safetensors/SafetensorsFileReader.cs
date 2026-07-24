@@ -174,6 +174,7 @@ public class SafetensorsFileReader
         torch.Tensor result = torch.tensor(values, dtype: torch.ScalarType.Float64);
         if (dtype == SafetensorsDType.BF16 && (info.Shape == null || info.Shape.Length == 0) && values.Length > 0 && Math.Abs(values[0]) > 1024)
         {
+            info.DType = SafetensorsDType.F16.ToSafetensorsString();
             values = MemoryMarshal.Cast<byte, Half>(data).ToArray().Select(h => (double)h).ToArray();
             result = torch.tensor(values, dtype: torch.ScalarType.Float64);
         }

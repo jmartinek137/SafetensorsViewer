@@ -206,13 +206,11 @@ namespace SafetensorsViewer
                         }
                         else if (sfr.TensorRegistry.ContainsKey(_selectedTensorKey))
                         {
+                            tensor = sfr.LoadTensor(_selectedTensorKey);
                             SafetensorsDType originalDType = SafetensorsDTypeExtensions.Parse(sfr.GetInfo(_selectedTensorKey).DType);
                             _originalDTypes[_selectedTensorKey] = originalDType;
 
-                            SafetensorsDType selectedDType = _originalDTypes[_selectedTensorKey];
-                            tensor = sfr.LoadTensor(_selectedTensorKey);
-
-                            ConfigureBrushStepForDType(selectedDType);
+                            ConfigureBrushStepForDType(originalDType);
                         }
                         else
                         {
