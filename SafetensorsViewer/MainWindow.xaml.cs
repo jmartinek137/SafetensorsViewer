@@ -548,25 +548,34 @@ namespace SafetensorsViewer
             int dataY = rows - 1 - y;
 
             double delta = increase ? BrushStep : -BrushStep;
-            double newValue = DataMatrix[dataY, x] + delta;
-            DataMatrix[dataY, x] = newValue;
-
-            // Keep the underlying tensor in sync so the edit is visible immediately.
-            // LoadedSafetensors is always a 2D view of the loaded tensor, so any shape is safe.
-            if (LoadedSafetensors is not null)
-            {
-                LoadedSafetensors[dataY, x] = torch.tensor(newValue);
-            }
-
             if (SelectedTensorKey is not null && _sfr is not null)
             {
                 var adapterInfo = DeltaMatrixCalculator.DetectAdapter(SelectedTensorKey, _sfr.Keys, _sfr);
                 if (adapterInfo.Type != DeltaMatrixCalculator.AdapterType.None)
                 {
                     DeltaMatrixCalculator.DecomposeDeltaEdit(adapterInfo, _sfr, dataY, x, delta, PendingEditsByTensor);
+
+                    torch.Tensor recomputedDelta = DeltaMatrixCalculator.ComputeDelta(adapterInfo, _sfr, PendingEditsByTensor);
+                    LoadedSafetensors = recomputedDelta.reshape(rows, cols);
+
+                    double[] flatData = recomputedDelta.data<double>().ToArray();
+                    for (int r = 0; r < rows; r++)
+                    {
+                        for (int c = 0; c < cols; c++)
+                        {
+                            DataMatrix[r, c] = flatData[r * cols + c];
+                        }
+                    }
                 }
                 else
                 {
+                    double newValue = DataMatrix[dataY, x] + delta;
+                    DataMatrix[dataY, x] = newValue;
+                    if (LoadedSafetensors is not null)
+                    {
+                        LoadedSafetensors[dataY, x] = torch.tensor(newValue);
+                    }
+
                     if (!PendingEditsByTensor.TryGetValue(SelectedTensorKey, out List<TensorEdit>? edits))
                     {
                         edits = [];
@@ -577,6 +586,15 @@ namespace SafetensorsViewer
                         edits[existingIdx] = new TensorEdit(x, dataY, newValue);
                     else
                         edits.Add(new TensorEdit(x, dataY, newValue));
+                }
+            }
+            else
+            {
+                double newValue = DataMatrix[dataY, x] + delta;
+                DataMatrix[dataY, x] = newValue;
+                if (LoadedSafetensors is not null)
+                {
+                    LoadedSafetensors[dataY, x] = torch.tensor(newValue);
                 }
             }
 
