@@ -42,6 +42,75 @@ public class SafetensorsFileWriter
         fs.Write(data, 0, data.Length);
     }
 
+    public static void SaveAllTensors(
+        string filePath,
+        SafetensorsFileReader sfr,
+        Dictionary<string, List<SafetensorsViewer.TensorEdit>> pendingEdits,
+        Dictionary<string, SafetensorsDType> originalDTypes)
+    {
+        List<string> keys = sfr.Keys.ToList();
+        List<byte[]> tensorPayloads = new();
+        Dictionary<string, TensorInfo> header = new();
+
+        foreach (string key in keys)
+        {
+            TensorInfo originalInfo = sfr.GetInfo(key);
+            using torch.Tensor tensor = SafetensorsViewer.DeltaMatrixCalculator.LoadTensorWithEdits(key, sfr, pendingEdits);
+            SafetensorsDType originalDType = originalDTypes.GetValueOrDefault(key, SafetensorsDTypeExtensions.Parse(originalInfo.DType));
+
+            byte[] data = originalDType switch
+            {
+                SafetensorsDType.FP8_E4M3 => ConvertToFP8(tensor, FP8Converters.DoubleToE4M3),
+                SafetensorsDType.FP8_E5M2 => ConvertToFP8(tensor, FP8Converters.DoubleToE5M2),
+                SafetensorsDType.I4 => ConvertToI4(tensor),
+                _ => tensor.to_type(MapToTorchSharpType(originalDType)).bytes.ToArray()
+            };
+
+            tensorPayloads.Add(data);
+
+            TensorInfo info = new()
+            {
+                DType = originalDType.ToSafetensorsString(),
+                Shape = tensor.shape.Select(x => (long)x).ToArray(),
+                DataOffsets = [0, data.Length]
+            };
+
+            header[key] = info;
+        }
+
+        string json = "";
+        byte[] headerBytes = [];
+        long headerShift = 8;
+
+        for (int iteration = 0; iteration < 3; iteration++)
+        {
+            long currentOffset = 0;
+            for (int i = 0; i < keys.Count; i++)
+            {
+                TensorInfo info = header[keys[i]];
+                int len = tensorPayloads[i].Length;
+                info.DataOffsets = [headerShift + currentOffset, headerShift + currentOffset + len];
+                currentOffset += len;
+            }
+            json = JsonSerializer.Serialize(header);
+            headerBytes = Encoding.UTF8.GetBytes(json);
+            long newShift = 8 + headerBytes.Length;
+            if (newShift == headerShift) break;
+            headerShift = newShift;
+        }
+
+        using FileStream fs = new(filePath, FileMode.Create, FileAccess.Write);
+        Span<byte> lengthBytes = stackalloc byte[8];
+        BinaryPrimitives.WriteUInt64LittleEndian(lengthBytes, (ulong)headerBytes.Length);
+        fs.Write(lengthBytes);
+        fs.Write(headerBytes, 0, headerBytes.Length);
+
+        for (int i = 0; i < tensorPayloads.Count; i++)
+        {
+            fs.Write(tensorPayloads[i], 0, tensorPayloads[i].Length);
+        }
+    }
+
     static byte[] ConvertToFP8(torch.Tensor tensor, Func<double, byte> converter)
     {
         torch.Tensor flatTensor = tensor.to_type(torch.ScalarType.Float64).flatten();

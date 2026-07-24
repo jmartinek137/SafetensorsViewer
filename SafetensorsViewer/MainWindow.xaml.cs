@@ -199,7 +199,7 @@ namespace SafetensorsViewer
                             }
                             Status = $"Alpha diagnostic: {alphaDiag}";
 
-                            tensor = DeltaMatrixCalculator.ComputeDelta(adapterInfo, sfr);
+                            tensor = DeltaMatrixCalculator.ComputeDelta(adapterInfo, sfr, PendingEditsByTensor);
                             isComputedDelta = true;
                             _originalDTypes[_selectedTensorKey] = SafetensorsDType.F64;
                             ConfigureBrushStepForDType(SafetensorsDType.F64);
@@ -389,18 +389,11 @@ namespace SafetensorsViewer
 
         void SaveTensorTo(string filePath)
         {
-            if (LoadedSafetensors is null || SelectedTensorKey is null)
+            if (LoadedSafetensors is null || SelectedTensorKey is null || _sfr is null)
                 return;
 
-            SafetensorsDType originalDType = _originalDTypes.GetValueOrDefault(SelectedTensorKey, SafetensorsDType.F64);
-
-            // Restore the original tensor shape before writing so the file format stays correct.
-            torch.Tensor tensorToSave = _originalTensorShape is not null
-                ? LoadedSafetensors.reshape(_originalTensorShape)
-                : LoadedSafetensors;
-
-            SafetensorsFileWriter.SaveTensor(filePath, SelectedTensorKey, tensorToSave.clone(), originalDType);
-            PendingEditsByTensor.Remove(SelectedTensorKey);
+            SafetensorsFileWriter.SaveAllTensors(filePath, _sfr, PendingEditsByTensor, _originalDTypes);
+            PendingEditsByTensor.Clear();
         }
 
         private HashSet<string> _availableFileKeys = [];
@@ -565,14 +558,26 @@ namespace SafetensorsViewer
                 LoadedSafetensors[dataY, x] = torch.tensor(newValue);
             }
 
-            if (SelectedTensorKey is not null)
+            if (SelectedTensorKey is not null && _sfr is not null)
             {
-                if (!PendingEditsByTensor.TryGetValue(SelectedTensorKey, out List<TensorEdit>? edits))
+                var adapterInfo = DeltaMatrixCalculator.DetectAdapter(SelectedTensorKey, _sfr.Keys, _sfr);
+                if (adapterInfo.Type != DeltaMatrixCalculator.AdapterType.None)
                 {
-                    edits = [];
-                    PendingEditsByTensor[SelectedTensorKey] = edits;
+                    DeltaMatrixCalculator.DecomposeDeltaEdit(adapterInfo, _sfr, dataY, x, delta, PendingEditsByTensor);
                 }
-                edits.Add(new TensorEdit(x, dataY, newValue));
+                else
+                {
+                    if (!PendingEditsByTensor.TryGetValue(SelectedTensorKey, out List<TensorEdit>? edits))
+                    {
+                        edits = [];
+                        PendingEditsByTensor[SelectedTensorKey] = edits;
+                    }
+                    int existingIdx = edits.FindIndex(e => e.X == x && e.Y == dataY);
+                    if (existingIdx >= 0)
+                        edits[existingIdx] = new TensorEdit(x, dataY, newValue);
+                    else
+                        edits.Add(new TensorEdit(x, dataY, newValue));
+                }
             }
 
             HasChanges = true;
